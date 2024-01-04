@@ -1,0 +1,8 @@
+# build
+build/
+
+# target
+lishp
+
+# ccls
+.ccls-cache/
