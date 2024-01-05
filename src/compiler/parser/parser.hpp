@@ -6,8 +6,15 @@
 #include <vector>
 
 enum TokenType {
+  EOF_, // adding '_' so because EOF wasn't allowed
   LEFT_PAREN,
   RIGHT_PAREN,
+  KEYWORD,
+  IDENTIFIER,
+  NUMBER,
+  STRING,
+  WHITESPACE,
+  COMMENT,
 };
 
 struct Token {
@@ -23,22 +30,34 @@ public:
 
 private:
   Token read_token();
+  Token read_keyword();
+  Token read_identifier();
+  Token read_number();
+  Token read_string();
+  Token read_whitespace();
+  Token read_comment();
 
-  inline bool is_at_end() {
-    return _fstream.peek() == std::char_traits<char>::eof();
-  }
+  inline char peek() { return fstream_.peek(); }
+
+  inline bool is_at_end() { return peek() == std::char_traits<char>::eof(); }
 
   inline char advance() {
-    char c = _fstream.get();
-    ++_current;
+    char c = fstream_.get();
+    ++current_;
     return c;
   }
 
-  std::ifstream _fstream;
-  std::vector<Token> _res;
+  inline Token build_token(TokenType type) {
+    return {type, std::move(cur_string_)};
+  }
 
-  int _current;
-  int _start;
+  std::ifstream fstream_;
+  std::vector<Token> res_;
+
+  std::string cur_string_;
+
+  int current_;
+  int start_;
 };
 
 class AST {};
