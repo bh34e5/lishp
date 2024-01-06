@@ -2,11 +2,11 @@ SRC=src
 SRC_DIRS=$(shell find $(SRC) -type d)
 TARGET=lishp
 BUILD=build
-BUILD_DIRS=$(patsubst $(SRC)/%,$(BUILD)/%,$(SRC_DIRS))
+BUILD_DIRS=$(BUILD) $(patsubst $(SRC)/%,$(BUILD)/%,$(SRC_DIRS))
 
 CC=clang++
 DEPFLAGS=-MD -MP
-CFLAGS=-Wall -Wextra -g $(DEPFLAGS)
+CFLAGS=-Wall -Wextra -g $(DEPFLAGS) -std=c++17
 
 FILES=$(foreach D,$(SRC_DIRS),$(wildcard $(D)/*.cpp))
 OBJECTS=$(patsubst $(SRC)/%.cpp,$(BUILD)/%.o,$(FILES))
