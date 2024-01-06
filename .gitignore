@@ -3,6 +3,7 @@ build/
 
 # target
 lishp
+!src/lishp/
 
 # ccls
 .ccls-cache/
