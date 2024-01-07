@@ -1,8 +1,8 @@
 #include <iostream>
 #include <type_traits>
 
-#include "lishp.hpp"
-#include "primitives.hpp"
+#include "../lishp.hpp"
+#include "../primitives.hpp"
 
 template <typename L, typename R,
           std::enable_if_t<std::is_convertible_v<L *, LispObj *>, bool> = true,
@@ -24,17 +24,17 @@ static auto make_obj_form(T t) -> LispForm {
 template <> auto make_obj_form<LispForm>(LispForm t) -> LispForm { return t; }
 
 template <typename First, typename... Rest>
-static auto generate(First first, Rest... forms) -> LispCons * {
+static auto build_cons(First first, Rest... forms) -> LispCons * {
   LispForm firstForm = make_obj_form(first);
 
-  LispCons *rest = generate<Rest...>(forms...);
+  LispCons *rest = build_cons<Rest...>(forms...);
   LispForm restForm = make_obj_form(rest);
 
   return new LispCons{
       {LispObjType::ObjCons}, false, std::move(firstForm), std::move(restForm)};
 }
 
-template <typename First> static auto generate(First first) -> LispCons * {
+template <typename First> static auto build_cons(First first) -> LispCons * {
   LispForm firstForm = make_obj_form(first);
   return new LispCons{
       {LispObjType::ObjCons}, false, std::move(firstForm), LispForm::nil};
@@ -68,10 +68,10 @@ auto LishpRuntime::initialize_primitives() -> void {
   LispSymbol *ampRest = intern_symbol(ampRestStr);
   LispSymbol *rest = intern_symbol(restStr);
 
-  argsDecl = generate(car, cdr);
+  argsDecl = build_cons(car, cdr);
   define_primitive_function(consSym, argsDecl, cons);
 
-  argsDecl = generate(stream_, formatString, ampRest, rest);
+  argsDecl = build_cons(stream_, formatString, ampRest, rest);
   define_primitive_function(formatSym, argsDecl, format_);
 }
 

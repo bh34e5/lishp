@@ -46,6 +46,8 @@ struct LispCons : public LispObj {
   bool nil;
   LispForm car;
   LispForm cdr;
+
+  auto rest() -> LispCons;
 };
 
 typedef LispForm(PrimitiveFunction)(LispCons args);
