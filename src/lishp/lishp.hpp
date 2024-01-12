@@ -2,14 +2,17 @@
 #define lishp_lishp_h
 
 #include <map>
+#include <vector>
 
-#include "types.hpp"
+#include "types/types.hpp"
 
 class LishpRuntime {
 public:
   auto repl() -> void;
+  auto lookup_function(LispSymbol *sym) -> LispFunction;
 
 private:
+  auto run_program(std::vector<LispForm> forms) -> void;
   auto initialize_primitives() -> void;
 
   template <typename T, LispObjType objType> auto make_obj() -> T *;

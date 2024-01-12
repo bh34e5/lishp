@@ -3,6 +3,7 @@
 
 #include "../lishp.hpp"
 #include "../primitives.hpp"
+#include "exceptions.hpp"
 
 template <typename L, typename R,
           std::enable_if_t<std::is_convertible_v<L *, LispObj *>, bool> = true,
@@ -41,8 +42,52 @@ template <typename First> static auto build_cons(First first) -> LispCons * {
 }
 
 auto LishpRuntime::repl() -> void {
+  std::cout << "Called repl" << std::endl;
+
   initialize_primitives();
-  std::cout << "Doing stuff" << std::endl;
+
+  std::string f = "FORMAT";
+  LispSymbol *fs = intern_symbol(f);
+
+  std::string t = "T";
+  LispSymbol *ts = intern_symbol(t);
+
+  std::string output = "Testing the output from running eval\n";
+  LispString os{{LispObjType::ObjString}, std::move(output)};
+  LispForm osf = {LispFormType::FormObj, {.obj = &os}};
+
+  LispCons *firstRun = build_cons(fs, ts, osf);
+  LispForm rc = {LispFormType::FormObj, {.obj = firstRun}};
+
+  // FIXME: eventually this will turn into something like
+  // (loop
+  //   (format t "> ")
+  //   (print (eval (read))))
+  run_program({rc});
+}
+
+auto LishpRuntime::lookup_function(LispSymbol *sym) -> LispFunction {
+  using it_t = decltype(this->function_assocs_)::iterator;
+
+  it_t map_it = this->function_assocs_.find(sym);
+  if (map_it == this->function_assocs_.end()) {
+    throw RuntimeException(
+        "Unable to find function associated with the symbol");
+  }
+  return map_it->second;
+}
+
+auto LishpRuntime::run_program(std::vector<LispForm> forms) -> void {
+  using it_t = decltype(forms)::iterator;
+
+  it_t form_it = forms.begin();
+
+  while (form_it != forms.end()) {
+    LispCons *args = build_cons(*form_it);
+    eval(this, *args);
+
+    form_it = std::next(form_it);
+  }
 }
 
 auto LishpRuntime::initialize_primitives() -> void {
@@ -50,6 +95,7 @@ auto LishpRuntime::initialize_primitives() -> void {
 
   std::string consStr = "CONS";
   std::string formatStr = "FORMAT";
+  std::string readStr = "READ";
 
   std::string carStr = "CAR";
   std::string cdrStr = "CDR";
@@ -60,6 +106,7 @@ auto LishpRuntime::initialize_primitives() -> void {
 
   LispSymbol *consSym = intern_symbol(consStr);
   LispSymbol *formatSym = intern_symbol(formatStr);
+  LispSymbol *readSym = intern_symbol(readStr);
 
   LispSymbol *car = intern_symbol(carStr);
   LispSymbol *cdr = intern_symbol(cdrStr);
@@ -73,6 +120,9 @@ auto LishpRuntime::initialize_primitives() -> void {
 
   argsDecl = build_cons(stream_, formatString, ampRest, rest);
   define_primitive_function(formatSym, argsDecl, format_);
+
+  argsDecl = new LispCons{{LispObjType::ObjCons}, true, {}, {}};
+  define_primitive_function(readSym, argsDecl, read);
 }
 
 auto LishpRuntime::intern_symbol(std::string &lexeme) -> LispSymbol * {
@@ -83,6 +133,7 @@ auto LishpRuntime::intern_symbol(std::string &lexeme) -> LispSymbol * {
     if (map_it->first == lexeme) {
       return map_it->second;
     }
+    map_it = std::next(map_it);
   }
 
   LispSymbol *interned = new LispSymbol{{LispObjType::ObjSymbol}, lexeme};

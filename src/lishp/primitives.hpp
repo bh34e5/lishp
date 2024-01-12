@@ -5,5 +5,7 @@
 
 PrimitiveFunction cons;
 PrimitiveFunction format_;
+PrimitiveFunction read;
+PrimitiveFunction eval;
 
 #endif

@@ -50,7 +50,8 @@ struct LispCons : public LispObj {
   auto rest() -> LispCons;
 };
 
-typedef LispForm(PrimitiveFunction)(LispCons args);
+class LishpRuntime;
+typedef LispForm(PrimitiveFunction)(LishpRuntime *rt, LispCons args);
 
 struct LispFunction : public LispObj {
   bool primitive;
@@ -62,6 +63,8 @@ struct LispFunction : public LispObj {
     } declared;
     PrimitiveFunction *inherent;
   } body;
+
+  auto call(LishpRuntime *rt, LispCons args) -> LispForm;
 };
 
 struct LispString : public LispObj {
