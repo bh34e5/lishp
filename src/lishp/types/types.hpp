@@ -16,6 +16,8 @@ enum LispObjType {
 
 struct LispObj {
   LispObjType type;
+
+  auto to_string() -> std::string;
 };
 
 /*-----------*
@@ -24,6 +26,7 @@ struct LispObj {
 
 enum LispFormType {
   FormNil,
+  FormT,
   FormNumber,
   FormObj,
 };
@@ -35,7 +38,17 @@ struct LispForm {
     LispObj *obj;
   } as;
 
-  static LispForm nil;
+  static auto nil() -> LispForm {
+    return LispForm{LispFormType::FormNil, {.obj = NULL}};
+  }
+
+  static auto t() -> LispForm {
+    return LispForm{LispFormType::FormT, {.obj = NULL}};
+  }
+
+  auto is_nil() -> bool;
+  auto is_t() -> bool;
+  auto to_string() -> std::string;
 };
 
 /*--------------------------------*
@@ -47,7 +60,8 @@ struct LispCons : public LispObj {
   LispForm car;
   LispForm cdr;
 
-  auto rest() -> LispCons;
+  auto rest() -> LispCons *;
+  auto to_string() -> std::string;
 };
 
 class LishpRuntime;
@@ -65,16 +79,19 @@ struct LispFunction : public LispObj {
   } body;
 
   auto call(LishpRuntime *rt, LispCons args) -> LispForm;
+  auto to_string() -> std::string;
 };
 
 struct LispString : public LispObj {
   std::string str;
+  auto to_string() -> std::string;
 };
 
 struct LispSymbol : public LispObj {
   std::string lexeme;
 
   friend auto operator<(const LispSymbol &l, const LispSymbol &r) -> bool;
+  auto to_string() -> std::string;
 };
 
 inline auto operator<(const LispSymbol &l, const LispSymbol &r) -> bool {

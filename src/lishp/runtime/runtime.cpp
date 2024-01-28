@@ -2,7 +2,7 @@
 #include <type_traits>
 
 #include "../lishp.hpp"
-#include "../primitives.hpp"
+#include "../primitives/primitives.hpp"
 #include "exceptions.hpp"
 
 template <typename L, typename R,
@@ -11,15 +11,15 @@ template <typename L, typename R,
 static auto make_obj_cons(L *l, R *r) -> LispCons {
   return {{LispObjType::ObjCons},
           false,
-          {LispFormType::FormObj, {.obj = (LispObj *)l}},
-          {LispFormType::FormObj, {.obj = (LispObj *)r}}};
+          {LispFormType::FormObj, {.obj = l}},
+          {LispFormType::FormObj, {.obj = r}}};
 }
 
 template <typename T, std::enable_if_t<std::is_same_v<T, LispForm> ||
                                            std::is_convertible_v<T, LispObj *>,
                                        bool> = true>
 static auto make_obj_form(T t) -> LispForm {
-  return {LispFormType::FormObj, {.obj = (LispObj *)t}};
+  return {LispFormType::FormObj, {.obj = t}};
 }
 
 template <> auto make_obj_form<LispForm>(LispForm t) -> LispForm { return t; }
@@ -38,7 +38,7 @@ static auto build_cons(First first, Rest... forms) -> LispCons * {
 template <typename First> static auto build_cons(First first) -> LispCons * {
   LispForm firstForm = make_obj_form(first);
   return new LispCons{
-      {LispObjType::ObjCons}, false, std::move(firstForm), LispForm::nil};
+      {LispObjType::ObjCons}, false, std::move(firstForm), LispForm::nil()};
 }
 
 auto LishpRuntime::repl() -> void {
@@ -56,7 +56,11 @@ auto LishpRuntime::repl() -> void {
   LispString os{{LispObjType::ObjString}, std::move(output)};
   LispForm osf = {LispFormType::FormObj, {.obj = &os}};
 
-  LispCons *firstRun = build_cons(fs, ts, osf);
+  std::string read_str = "READ";
+  LispSymbol *read_sym = intern_symbol(read_str);
+  LispCons *read_cons = build_cons(read_sym);
+  LispCons *firstRun = build_cons(fs, ts, osf, read_cons);
+
   LispForm rc = {LispFormType::FormObj, {.obj = firstRun}};
 
   // FIXME: eventually this will turn into something like
@@ -77,6 +81,21 @@ auto LishpRuntime::lookup_function(LispSymbol *sym) -> LispFunction {
   return map_it->second;
 }
 
+auto LishpRuntime::lookup_symbol(LispSymbol *sym) -> LispForm {
+  using it_t = decltype(this->symbol_assocs_)::iterator;
+
+  it_t map_it = this->symbol_assocs_.find(sym);
+  if (map_it == this->symbol_assocs_.end()) {
+    std::cout << "in reading \"" << sym->lexeme << "\"" << std::endl;
+    throw RuntimeException("Symbol unbound in current context");
+  }
+  return map_it->second;
+}
+
+auto LishpRuntime::get_reader() -> Reader & { return this->reader_; }
+
+auto LishpRuntime::cur_readtable() -> Readtable & { return this->table_; }
+
 auto LishpRuntime::run_program(std::vector<LispForm> forms) -> void {
   using it_t = decltype(forms)::iterator;
 
@@ -91,6 +110,7 @@ auto LishpRuntime::run_program(std::vector<LispForm> forms) -> void {
 }
 
 auto LishpRuntime::initialize_primitives() -> void {
+  // functions
   LispCons *argsDecl = nullptr;
 
   std::string consStr = "CONS";
@@ -123,6 +143,20 @@ auto LishpRuntime::initialize_primitives() -> void {
 
   argsDecl = new LispCons{{LispObjType::ObjCons}, true, {}, {}};
   define_primitive_function(readSym, argsDecl, read);
+
+  // symbols
+  std::string t_str = "T";
+  std::string nil_str = "NIL";
+
+  LispSymbol *t_sym = intern_symbol(t_str);
+  LispSymbol *nil_sym = intern_symbol(nil_str);
+
+  bind(t_sym, LispForm::t());
+  bind(nil_sym, LispForm::nil());
+}
+
+auto LishpRuntime::bind(LispSymbol *sym, LispForm val) -> void {
+  this->symbol_assocs_.insert({sym, val});
 }
 
 auto LishpRuntime::intern_symbol(std::string &lexeme) -> LispSymbol * {
