@@ -48,28 +48,36 @@ auto LishpRuntime::repl() -> void {
 
   initialize_primitives();
 
-  std::string f = "FORMAT";
-  LispSymbol *fs = intern_symbol(f);
-
-  std::string t = "T";
-  LispSymbol *ts = intern_symbol(t);
+  LispSymbol *format_sym = intern_symbol("FORMAT");
+  LispSymbol *t_sym = intern_symbol("T");
+  LispSymbol *loop_sym = intern_symbol("LOOP");
+  LispSymbol *eval_sym = intern_symbol("EVAL");
+  LispSymbol *read_sym = intern_symbol("READ");
 
   std::string output = "Testing the output from running eval\n";
   LispString os{{LispObjType::ObjString}, std::move(output)};
   LispForm osf = {LispFormType::FormObj, {.obj = &os}};
 
-  std::string read_str = "READ";
-  LispSymbol *read_sym = intern_symbol(read_str);
   LispCons *read_cons = build_cons(read_sym);
-  LispCons *first_run = build_cons(fs, ts, osf, read_cons);
+  LispCons *first_run = build_cons(format_sym, t_sym, osf, read_cons);
 
   LispForm rc = {LispFormType::FormObj, {.obj = first_run}};
+
+  LispString prompt{{LispObjType::ObjString}, "> "};
+  LispForm prompt_form{LispFormType::FormObj, {.obj = &prompt}};
+
+  LispCons *loop_cons =
+      build_cons(loop_sym, build_cons(format_sym, t_sym, prompt_form),
+                 build_cons(format_sym, t_sym,
+                            build_cons(eval_sym, build_cons(read_sym))));
+
+  LispForm loop_form{LispFormType::FormObj, {.obj = loop_cons}};
 
   // FIXME: eventually this will turn into something like
   // (loop
   //   (format t "> ")
-  //   (print (eval (read))))
-  run_program({rc});
+  //   (format t (eval (read))))
+  run_program({rc, loop_form});
 }
 
 auto LishpRuntime::lookup_function(LispSymbol *sym) -> LispFunction {
@@ -115,27 +123,19 @@ auto LishpRuntime::initialize_primitives() -> void {
   // functions
   LispCons *args_decl = nullptr;
 
-  std::string cons_str = "CONS";
-  std::string format_str = "FORMAT";
-  std::string read_str = "READ";
+  LispSymbol *cons_sym = intern_symbol("CONS");
+  LispSymbol *format_sym = intern_symbol("FORMAT");
+  LispSymbol *read_sym = intern_symbol("READ");
+  LispSymbol *eval_sym = intern_symbol("EVAL");
+  LispSymbol *loop_sym = intern_symbol("LOOP");
 
-  std::string car_str = "CAR";
-  std::string cdr_str = "CDR";
-  std::string stream_str = "STREAM";
-  std::string format_string_str = "FORMAT-STRING";
-  std::string amp_rest_str = "&REST";
-  std::string rest_str = "REST";
-
-  LispSymbol *cons_sym = intern_symbol(cons_str);
-  LispSymbol *format_sym = intern_symbol(format_str);
-  LispSymbol *read_sym = intern_symbol(read_str);
-
-  LispSymbol *car = intern_symbol(car_str);
-  LispSymbol *cdr = intern_symbol(cdr_str);
-  LispSymbol *stream_ = intern_symbol(stream_str);
-  LispSymbol *format_string_ = intern_symbol(format_string_str);
-  LispSymbol *amp_rest = intern_symbol(amp_rest_str);
-  LispSymbol *rest = intern_symbol(rest_str);
+  LispSymbol *car = intern_symbol("CAR");
+  LispSymbol *cdr = intern_symbol("CDR");
+  LispSymbol *stream_ = intern_symbol("STREAM");
+  LispSymbol *format_string_ = intern_symbol("FORMAT-STR");
+  LispSymbol *amp_rest = intern_symbol("&REST");
+  LispSymbol *rest = intern_symbol("REST");
+  LispSymbol *form = intern_symbol("FORM");
 
   args_decl = build_cons(car, cdr);
   define_primitive_function(cons_sym, args_decl, cons);
@@ -146,12 +146,15 @@ auto LishpRuntime::initialize_primitives() -> void {
   args_decl = new LispCons{{LispObjType::ObjCons}, true, {}, {}};
   define_primitive_function(read_sym, args_decl, read);
 
-  // symbols
-  std::string t_str = "T";
-  std::string nil_str = "NIL";
+  args_decl = build_cons(form);
+  define_primitive_function(eval_sym, args_decl, eval);
 
-  LispSymbol *t_sym = intern_symbol(t_str);
-  LispSymbol *nil_sym = intern_symbol(nil_str);
+  args_decl = build_cons(amp_rest, rest);
+  define_primitive_function(loop_sym, args_decl, loop);
+
+  // symbols
+  LispSymbol *t_sym = intern_symbol("T");
+  LispSymbol *nil_sym = intern_symbol("NIL");
 
   bind(t_sym, LispForm::t());
   bind(nil_sym, LispForm::nil());
@@ -176,4 +179,10 @@ auto LishpRuntime::intern_symbol(std::string &lexeme) -> LispSymbol * {
   interned_symbols_.insert(map_it, {lexeme, interned});
 
   return interned;
+}
+
+auto LishpRuntime::intern_symbol(std::string &&lexeme) -> LispSymbol * {
+  // an overload that I guess frees the resources of the string when this
+  // function ends?
+  return intern_symbol(lexeme);
 }

@@ -31,6 +31,7 @@ private:
   }
 
   auto intern_symbol(std::string &lexeme) -> LispSymbol *;
+  auto intern_symbol(std::string &&lexeme) -> LispSymbol *;
 
   Reader reader_;
 

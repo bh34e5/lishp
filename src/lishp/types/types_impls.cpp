@@ -28,24 +28,15 @@ auto LispCons::rest() -> LispCons * {
   return cdr_cons;
 }
 
-static auto eval_args(LishpRuntime *rt, LispCons *args) -> LispCons {
-  LispForm first = eval_form(rt, args->car);
-  LispForm rest = LispForm::nil();
-  if (!args->cdr.is_nil()) {
-    LispCons *rest_cons = new LispCons(eval_args(rt, args->rest()));
-    rest = LispForm{LispFormType::FormObj, {.obj = rest_cons}};
-  }
-
-  return LispCons{
-      {LispObjType::ObjCons}, false, std::move(first), std::move(rest)};
-}
-
 auto LispFunction::call(LishpRuntime *rt, LispCons args) -> LispForm {
-  LispCons evaled_args = eval_args(rt, &args);
   if (this->primitive) {
     PrimitiveFunction *inherent = this->body.inherent;
-    return inherent(rt, evaled_args);
+    // don't eval args before calling the inherent, because they may not
+    // evaluate all the forms. e.g., conditionals.
+    return inherent(rt, args);
   }
+
+  LispCons evaled_args = eval_args(rt, &args);
   throw RuntimeException("Can't run user-defined functions");
 }
 

@@ -8,4 +8,6 @@ auto eval_symbol(LishpRuntime *rt, LispSymbol *sym) -> LispForm;
 auto eval_cons(LishpRuntime *rt, LispCons *cons) -> LispForm;
 auto eval_form(LishpRuntime *rt, LispForm form) -> LispForm;
 
+auto eval_args(LishpRuntime *rt, LispCons *args) -> LispCons;
+
 #endif

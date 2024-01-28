@@ -14,6 +14,8 @@ static auto read_list_rec(Reader *reader, Readtable &table,
   if (c == ')') {
     in_stream.get(); // read close paren
     return LispForm::nil();
+  } else if (c == '.') {
+    throw RuntimeException("Cannot parse dotted pairs/lists");
   }
 
   LispForm f = reader->read_form(table, in_stream);

@@ -8,4 +8,8 @@ PrimitiveFunction format_;
 PrimitiveFunction read;
 PrimitiveFunction eval;
 
+// FIXME: this is not actually primitive, it can be written with tagbody and
+// goto
+PrimitiveFunction loop;
+
 #endif
