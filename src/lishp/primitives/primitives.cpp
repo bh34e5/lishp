@@ -26,15 +26,15 @@ auto format_(LishpRuntime *rt, LispCons args) -> LispForm {
 
   LispCons *rest = args.rest();
 
-  LispForm formatStr = rest->car;
+  LispForm format_str = rest->car;
 
-  if (formatStr.type != LispFormType::FormObj) {
+  if (format_str.type != LispFormType::FormObj) {
     // TODO: figure out how I want to do exceptions and what kind of information
     // I want to give
     throw RuntimeException("Expected argument of type String");
   }
 
-  LispObj *obj = formatStr.as.obj;
+  LispObj *obj = format_str.as.obj;
 
   if (obj->type != LispObjType::ObjString) {
     throw RuntimeException("Expected argument of type String");

@@ -69,7 +69,7 @@ typedef LispForm(PrimitiveFunction)(LishpRuntime *rt, LispCons args);
 
 struct LispFunction : public LispObj {
   bool primitive;
-  LispCons *argsDecl;
+  LispCons *args_decl;
   union {
     struct {
       LispCons *args;

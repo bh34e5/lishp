@@ -26,19 +26,21 @@ template <> auto make_obj_form<LispForm>(LispForm t) -> LispForm { return t; }
 
 template <typename First, typename... Rest>
 static auto build_cons(First first, Rest... forms) -> LispCons * {
-  LispForm firstForm = make_obj_form(first);
+  LispForm first_form = make_obj_form(first);
 
   LispCons *rest = build_cons<Rest...>(forms...);
-  LispForm restForm = make_obj_form(rest);
+  LispForm rest_form = make_obj_form(rest);
 
-  return new LispCons{
-      {LispObjType::ObjCons}, false, std::move(firstForm), std::move(restForm)};
+  return new LispCons{{LispObjType::ObjCons},
+                      false,
+                      std::move(first_form),
+                      std::move(rest_form)};
 }
 
 template <typename First> static auto build_cons(First first) -> LispCons * {
-  LispForm firstForm = make_obj_form(first);
+  LispForm first_form = make_obj_form(first);
   return new LispCons{
-      {LispObjType::ObjCons}, false, std::move(firstForm), LispForm::nil()};
+      {LispObjType::ObjCons}, false, std::move(first_form), LispForm::nil()};
 }
 
 auto LishpRuntime::repl() -> void {
@@ -59,9 +61,9 @@ auto LishpRuntime::repl() -> void {
   std::string read_str = "READ";
   LispSymbol *read_sym = intern_symbol(read_str);
   LispCons *read_cons = build_cons(read_sym);
-  LispCons *firstRun = build_cons(fs, ts, osf, read_cons);
+  LispCons *first_run = build_cons(fs, ts, osf, read_cons);
 
-  LispForm rc = {LispFormType::FormObj, {.obj = firstRun}};
+  LispForm rc = {LispFormType::FormObj, {.obj = first_run}};
 
   // FIXME: eventually this will turn into something like
   // (loop
@@ -111,38 +113,38 @@ auto LishpRuntime::run_program(std::vector<LispForm> forms) -> void {
 
 auto LishpRuntime::initialize_primitives() -> void {
   // functions
-  LispCons *argsDecl = nullptr;
+  LispCons *args_decl = nullptr;
 
-  std::string consStr = "CONS";
-  std::string formatStr = "FORMAT";
-  std::string readStr = "READ";
+  std::string cons_str = "CONS";
+  std::string format_str = "FORMAT";
+  std::string read_str = "READ";
 
-  std::string carStr = "CAR";
-  std::string cdrStr = "CDR";
-  std::string streamStr = "STREAM";
-  std::string formatStringStr = "FORMAT-STRING";
-  std::string ampRestStr = "&REST";
-  std::string restStr = "REST";
+  std::string car_str = "CAR";
+  std::string cdr_str = "CDR";
+  std::string stream_str = "STREAM";
+  std::string format_string_str = "FORMAT-STRING";
+  std::string amp_rest_str = "&REST";
+  std::string rest_str = "REST";
 
-  LispSymbol *consSym = intern_symbol(consStr);
-  LispSymbol *formatSym = intern_symbol(formatStr);
-  LispSymbol *readSym = intern_symbol(readStr);
+  LispSymbol *cons_sym = intern_symbol(cons_str);
+  LispSymbol *format_sym = intern_symbol(format_str);
+  LispSymbol *read_sym = intern_symbol(read_str);
 
-  LispSymbol *car = intern_symbol(carStr);
-  LispSymbol *cdr = intern_symbol(cdrStr);
-  LispSymbol *stream_ = intern_symbol(streamStr);
-  LispSymbol *formatString = intern_symbol(formatStringStr);
-  LispSymbol *ampRest = intern_symbol(ampRestStr);
-  LispSymbol *rest = intern_symbol(restStr);
+  LispSymbol *car = intern_symbol(car_str);
+  LispSymbol *cdr = intern_symbol(cdr_str);
+  LispSymbol *stream_ = intern_symbol(stream_str);
+  LispSymbol *format_string_ = intern_symbol(format_string_str);
+  LispSymbol *amp_rest = intern_symbol(amp_rest_str);
+  LispSymbol *rest = intern_symbol(rest_str);
 
-  argsDecl = build_cons(car, cdr);
-  define_primitive_function(consSym, argsDecl, cons);
+  args_decl = build_cons(car, cdr);
+  define_primitive_function(cons_sym, args_decl, cons);
 
-  argsDecl = build_cons(stream_, formatString, ampRest, rest);
-  define_primitive_function(formatSym, argsDecl, format_);
+  args_decl = build_cons(stream_, format_string_, amp_rest, rest);
+  define_primitive_function(format_sym, args_decl, format_);
 
-  argsDecl = new LispCons{{LispObjType::ObjCons}, true, {}, {}};
-  define_primitive_function(readSym, argsDecl, read);
+  args_decl = new LispCons{{LispObjType::ObjCons}, true, {}, {}};
+  define_primitive_function(read_sym, args_decl, read);
 
   // symbols
   std::string t_str = "T";

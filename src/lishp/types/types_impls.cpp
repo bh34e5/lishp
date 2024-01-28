@@ -18,14 +18,14 @@ auto LispCons::rest() -> LispCons * {
     throw RuntimeException("Unexpected arguments");
   }
 
-  LispObj *cdrObj = cdr.as.obj;
+  LispObj *cdr_obj = cdr.as.obj;
 
-  if (cdrObj->type != LispObjType::ObjCons) {
+  if (cdr_obj->type != LispObjType::ObjCons) {
     throw RuntimeException("Unexpected arguments");
   }
 
-  LispCons *cdrCons = (LispCons *)cdrObj;
-  return cdrCons;
+  LispCons *cdr_cons = (LispCons *)cdr_obj;
+  return cdr_cons;
 }
 
 static auto eval_args(LishpRuntime *rt, LispCons *args) -> LispCons {
