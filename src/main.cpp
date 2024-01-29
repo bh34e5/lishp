@@ -8,15 +8,16 @@ void usage();
 
 int main(int argc, char const *argv[]) {
   switch (argc) {
-  case 1:
+  case 1: {
     interpret();
-    break;
-  case 2:
+  } break;
+  case 2: {
     compile_file(argv[1]);
-    break;
-  default:
+  } break;
+  default: {
     usage();
     return 1;
+  }
   }
   return 0;
 }

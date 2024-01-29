@@ -30,17 +30,12 @@ private:
     function_assocs_.insert({name, functionObj});
   }
 
-  auto intern_symbol(std::string &lexeme) -> LispSymbol *;
-  auto intern_symbol(std::string &&lexeme) -> LispSymbol *;
-
   Reader reader_;
 
-  // TODO: eventually this will get pulled out to a namespace class
   Readtable table_;
+
   std::map<LispSymbol *, LispForm> symbol_assocs_;
   std::map<LispSymbol *, LispFunction> function_assocs_;
-
-  std::map<std::string, LispSymbol *> interned_symbols_;
 };
 
 #endif

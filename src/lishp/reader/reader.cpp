@@ -1,6 +1,7 @@
 #include "reader.hpp"
 
 #include <map>
+#include <string>
 
 #include "../runtime/exceptions.hpp"
 
@@ -92,6 +93,38 @@ auto read_whitespace(std::istream &in_stream) -> void {
   }
 }
 
+auto caseable(const char c) { return std::isalpha(c); }
+
+auto to_case(Readtable::Readcase r_case, const char c) -> char {
+  switch (r_case) {
+  case Readtable::UPPER:
+    return std::toupper(c);
+  }
+}
+
+auto read_token(Readtable &table, std::istream &in_stream) -> std::string {
+  std::string str;
+
+  char c = in_stream.peek();
+  while (c != EOF && !lisp_whitespace(c)) {
+    c = in_stream.get();
+    if (caseable(c)) {
+      Readtable::Readcase r_case = table.cur_case();
+      c = to_case(r_case, c);
+    }
+
+    str.push_back(c);
+    c = in_stream.peek();
+  }
+  return str;
+}
+
+enum TokenType { PossibleNum, Num, Symbol };
+auto token_type(std::string token) -> TokenType {
+  // FIXME: right now, assuming all tokens are symbols.
+  return TokenType::Symbol;
+}
+
 auto Reader::read_form(Readtable &table, std::istream &in_stream) -> LispForm {
   char c = in_stream.peek();
   while (c != EOF) {
@@ -103,11 +136,22 @@ auto Reader::read_form(Readtable &table, std::istream &in_stream) -> LispForm {
     default:
       if (lisp_whitespace(c)) {
         read_whitespace(in_stream);
-      } else {
+        goto continue_loop;
+      }
 
-        throw RuntimeException("Unimplemented read value");
+      std::string token = read_token(table, in_stream);
+      switch (token_type(token)) {
+      case Symbol: {
+        // do stuff
+        LispSymbol *symbol = table.intern_symbol(token);
+        return {LispFormType::FormObj, {.obj = symbol}};
+      } break;
+      default:
+        throw RuntimeException(
+            "Cannot read anything other than symbols at the moment");
       }
     }
+  continue_loop:
     c = in_stream.peek();
   }
   throw RuntimeException("Reached EOF while reading form");

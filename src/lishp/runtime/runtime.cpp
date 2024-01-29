@@ -48,11 +48,11 @@ auto LishpRuntime::repl() -> void {
 
   initialize_primitives();
 
-  LispSymbol *format_sym = intern_symbol("FORMAT");
-  LispSymbol *t_sym = intern_symbol("T");
-  LispSymbol *loop_sym = intern_symbol("LOOP");
-  LispSymbol *eval_sym = intern_symbol("EVAL");
-  LispSymbol *read_sym = intern_symbol("READ");
+  LispSymbol *format_sym = table_.intern_symbol("FORMAT");
+  LispSymbol *t_sym = table_.intern_symbol("T");
+  LispSymbol *loop_sym = table_.intern_symbol("LOOP");
+  LispSymbol *eval_sym = table_.intern_symbol("EVAL");
+  LispSymbol *read_sym = table_.intern_symbol("READ");
 
   std::string output = "Testing the output from running eval\n";
   LispString os{{LispObjType::ObjString}, std::move(output)};
@@ -64,11 +64,14 @@ auto LishpRuntime::repl() -> void {
   LispForm rc = {LispFormType::FormObj, {.obj = first_run}};
 
   LispString prompt{{LispObjType::ObjString}, "> "};
+  LispString obj_print{{LispObjType::ObjString}, "~a~%"};
+
   LispForm prompt_form{LispFormType::FormObj, {.obj = &prompt}};
+  LispForm obj_print_form{LispFormType::FormObj, {.obj = &obj_print}};
 
   LispCons *loop_cons =
       build_cons(loop_sym, build_cons(format_sym, t_sym, prompt_form),
-                 build_cons(format_sym, t_sym,
+                 build_cons(format_sym, t_sym, obj_print_form,
                             build_cons(eval_sym, build_cons(read_sym))));
 
   LispForm loop_form{LispFormType::FormObj, {.obj = loop_cons}};
@@ -123,19 +126,19 @@ auto LishpRuntime::initialize_primitives() -> void {
   // functions
   LispCons *args_decl = nullptr;
 
-  LispSymbol *cons_sym = intern_symbol("CONS");
-  LispSymbol *format_sym = intern_symbol("FORMAT");
-  LispSymbol *read_sym = intern_symbol("READ");
-  LispSymbol *eval_sym = intern_symbol("EVAL");
-  LispSymbol *loop_sym = intern_symbol("LOOP");
+  LispSymbol *cons_sym = table_.intern_symbol("CONS");
+  LispSymbol *format_sym = table_.intern_symbol("FORMAT");
+  LispSymbol *read_sym = table_.intern_symbol("READ");
+  LispSymbol *eval_sym = table_.intern_symbol("EVAL");
+  LispSymbol *loop_sym = table_.intern_symbol("LOOP");
 
-  LispSymbol *car = intern_symbol("CAR");
-  LispSymbol *cdr = intern_symbol("CDR");
-  LispSymbol *stream_ = intern_symbol("STREAM");
-  LispSymbol *format_string_ = intern_symbol("FORMAT-STR");
-  LispSymbol *amp_rest = intern_symbol("&REST");
-  LispSymbol *rest = intern_symbol("REST");
-  LispSymbol *form = intern_symbol("FORM");
+  LispSymbol *car = table_.intern_symbol("CAR");
+  LispSymbol *cdr = table_.intern_symbol("CDR");
+  LispSymbol *stream_ = table_.intern_symbol("STREAM");
+  LispSymbol *format_string_ = table_.intern_symbol("FORMAT-STR");
+  LispSymbol *amp_rest = table_.intern_symbol("&REST");
+  LispSymbol *rest = table_.intern_symbol("REST");
+  LispSymbol *form = table_.intern_symbol("FORM");
 
   args_decl = build_cons(car, cdr);
   define_primitive_function(cons_sym, args_decl, cons);
@@ -153,8 +156,8 @@ auto LishpRuntime::initialize_primitives() -> void {
   define_primitive_function(loop_sym, args_decl, loop);
 
   // symbols
-  LispSymbol *t_sym = intern_symbol("T");
-  LispSymbol *nil_sym = intern_symbol("NIL");
+  LispSymbol *t_sym = table_.intern_symbol("T");
+  LispSymbol *nil_sym = table_.intern_symbol("NIL");
 
   bind(t_sym, LispForm::t());
   bind(nil_sym, LispForm::nil());
@@ -162,27 +165,4 @@ auto LishpRuntime::initialize_primitives() -> void {
 
 auto LishpRuntime::bind(LispSymbol *sym, LispForm val) -> void {
   this->symbol_assocs_.insert({sym, val});
-}
-
-auto LishpRuntime::intern_symbol(std::string &lexeme) -> LispSymbol * {
-  using it_t = decltype(interned_symbols_)::iterator;
-
-  it_t map_it = interned_symbols_.begin();
-  while (map_it != interned_symbols_.end()) {
-    if (map_it->first == lexeme) {
-      return map_it->second;
-    }
-    map_it = std::next(map_it);
-  }
-
-  LispSymbol *interned = new LispSymbol{{LispObjType::ObjSymbol}, lexeme};
-  interned_symbols_.insert(map_it, {lexeme, interned});
-
-  return interned;
-}
-
-auto LishpRuntime::intern_symbol(std::string &&lexeme) -> LispSymbol * {
-  // an overload that I guess frees the resources of the string when this
-  // function ends?
-  return intern_symbol(lexeme);
 }

@@ -56,7 +56,8 @@ auto read(LishpRuntime *rt, LispCons args) -> LispForm {
 
 auto eval(LishpRuntime *rt, LispCons args) -> LispForm {
   // To match other primitives, the args are packaged into a single element list
-  LispForm car = args.car;
+  LispCons evaled_args = eval_args(rt, &args);
+  LispForm car = evaled_args.car;
   return eval_form(rt, car);
 }
 
