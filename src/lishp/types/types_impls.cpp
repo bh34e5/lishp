@@ -28,6 +28,38 @@ auto LispCons::rest() -> LispCons * {
   return cdr_cons;
 }
 
+auto LispCons::list_ish_p() -> bool {
+  if (nil) {
+    return true;
+  }
+
+  if (cdr.is_nil()) {
+    return true;
+  }
+
+  if (cdr.type == LispFormType::FormObj &&
+      cdr.as.obj->type == LispObjType::ObjCons) {
+    return true;
+  }
+
+  return false;
+}
+
+auto LispCons::for_each(std::function<void(LispCons *)> &func) -> void {
+  if (!this->list_ish_p()) {
+    throw RuntimeException("Cannot iterate on dotted pair");
+  }
+
+  if (nil) {
+    return;
+  }
+
+  func(this);
+
+  LispCons *others = rest();
+  others->for_each(func);
+}
+
 auto LispFunction::call(LishpRuntime *rt, LispCons args) -> LispForm {
   if (this->primitive) {
     PrimitiveFunction *inherent = this->body.inherent;

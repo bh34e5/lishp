@@ -1,6 +1,7 @@
 #ifndef lishp_types_h
 #define lishp_types_h
 
+#include <functional>
 #include <string>
 
 /*-----------------*
@@ -61,6 +62,8 @@ struct LispCons : public LispObj {
   LispForm cdr;
 
   auto rest() -> LispCons *;
+  auto list_ish_p() -> bool;
+  auto for_each(std::function<void(LispCons *)> &func) -> void;
   auto to_string() -> std::string;
 };
 

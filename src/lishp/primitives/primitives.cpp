@@ -1,3 +1,4 @@
+#include <functional>
 #include <iostream>
 
 #include "../lishp.hpp"
@@ -14,6 +15,11 @@ auto cons(LishpRuntime *rt, LispCons args) -> LispForm {
   return {LispFormType::FormObj, {.obj = c}};
 }
 
+// FIXME: This should probably stop being a primitive at some point. Rather, the
+// stream operations should be primitive, while the format function is built off
+// those primitives. That is, something like looping over the format string,
+// swapping args as necessary, and then writing out to the passed stream using
+// primitives.
 auto format_(LishpRuntime *rt, LispCons args) -> LispForm {
   LispCons evaled_args = eval_args(rt, &args);
   std::cout << evaled_args.to_string() << std::endl;
@@ -59,7 +65,7 @@ auto eval(LishpRuntime *rt, LispCons args) -> LispForm {
   LispCons evaled_args = eval_args(rt, &args);
   LispForm car = evaled_args.car;
   return eval_form(rt, car);
-}
+};
 
 auto loop(LishpRuntime *rt, LispCons args) -> LispForm {
   while (true) {
@@ -85,6 +91,42 @@ auto loop(LishpRuntime *rt, LispCons args) -> LispForm {
       cur_cons = cur_cons->rest();
     }
   }
+
+  return LispForm::nil();
+}
+
+auto tagbody(LishpRuntime *rt, LispCons args) -> LispForm {
+  // FIXME: these are actually lexically bound tags... because `go` needs to be
+  // able to reference them when jumping...
+  //
+  // The body is its own lexical environment anyway, so I can just extend off
+  // where I am (from runtime?) and bind them there. I'll have a map for
+  // variable bindings, function bindings, and tag bodies?
+  std::map<LispForm *, LispCons *> control_points;
+
+  std::function<void(LispCons *)> add_syms = [&](LispCons *cons) {
+    if (cons->nil) {
+      // nothing to do
+      return;
+    }
+
+    LispForm *car = &cons->car;
+    if (car->type == LispFormType::FormObj &&
+        car->as.obj->type == LispObjType::ObjCons) {
+      // skip conses as they are not tags
+      return;
+    }
+
+    // car is an atom (FIXME: make sure this is actually true.. turn that into
+    // a function on the form class?)
+
+    control_points.insert({car, cons});
+  };
+
+  args.for_each(add_syms);
+
+  // TODO: execute the body one form at at time, not executing the tags, because
+  // there's no need; I think
 
   return LispForm::nil();
 }
