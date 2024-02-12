@@ -1,25 +1,41 @@
-SRC=src
-SRC_DIRS=$(shell find $(SRC) -type d)
-TARGET=lishp
-BUILD=build
-BUILD_DIRS=$(BUILD) $(patsubst $(SRC)/%,$(BUILD)/%,$(SRC_DIRS))
+SRC     = src
+INCLUDE = include
+TARGET  = lishp
+BUILD   = build
 
-CC=clang++
-DEPFLAGS=-MD -MP
-CFLAGS=-Wall -Wextra -g $(DEPFLAGS) -std=c++17
+SRC_DIRS   = $(shell find $(SRC) -type d)
+BUILD_DIRS = $(BUILD) $(patsubst $(SRC)/%,$(BUILD)/%,$(SRC_DIRS))
 
-FILES=$(foreach D,$(SRC_DIRS),$(wildcard $(D)/*.cpp))
-OBJECTS=$(patsubst $(SRC)/%.cpp,$(BUILD)/%.o,$(FILES))
-DEPFILES=$(patsubst $(SRC)/%.cpp,$(BUILD)/%.d,$(FILES))
+DEPFLAGS = -MD -MP
+
+CC = clang++
+CFLAGS += -Wall
+CFLAGS += -Wextra
+CFLAGS += -ggdb
+CFLAGS += -std=c++17
+#CFLAGS += -DDEBUG_MEMORY
+CFLAGS += $(DEPFLAGS)
+
+FILES    = $(shell find $(SRC) -type f -name '*.cpp')
+OBJECTS  = $(patsubst $(SRC)/%.cpp,$(BUILD)/%.o,$(FILES))
+DEPFILES = $(patsubst $(SRC)/%.cpp,$(BUILD)/%.d,$(FILES))
 
 .PHONY: all
 all: $(TARGET)
+
+run: all
+	@echo
+	@./lishp
+
+debug: all
+	@echo
+	@gdb ./lishp
 
 $(TARGET): $(OBJECTS)
 	$(CC) -o $@ $^
 
 $(BUILD)/%.o: $(SRC)/%.cpp | $(BUILD_DIRS)
-	$(CC) $(CFLAGS) $(foreach D,$(SRC_DIRS),-I$(D)) -o $@ -c $<
+	$(CC) -I$(INCLUDE) $(CFLAGS) -o $@ -c $<
 
 $(BUILD_DIRS):
 	mkdir -p $@

@@ -1,0 +1,336 @@
+#ifndef runtime_types_h
+#define runtime_types_h
+
+#include <assert.h>
+#include <cstdint>
+#include <iostream>
+#include <map>
+#include <string>
+#include <type_traits>
+
+#include "../memory/memory.hpp"
+
+// forward declaration...
+// TODO: try to figure out if I can remove the cyclical dependency
+namespace environment {
+class Environment;
+}
+
+namespace types {
+
+struct LishpObject;
+
+struct LishpForm {
+  enum Types {
+    kFixnum,
+    kChar,
+    kNil,
+    kObject,
+    kT,
+  };
+
+  Types type;
+  union {
+    std::uint32_t fixnum;
+    char ch;
+    LishpObject *object;
+  };
+
+  static inline auto Nil() { return LishpForm{kNil, {.fixnum = 0}}; }
+  static inline auto T() { return LishpForm{kT, {.fixnum = 0}}; }
+  static inline auto FromChar(char ch) { return LishpForm{kChar, {.ch = ch}}; }
+  static inline auto FromObj(LishpObject *obj) {
+    return LishpForm{kObject, {.object = obj}};
+  }
+
+  template <typename T> inline auto AssertAs() -> T *;
+
+  inline auto NilP() { return type == kNil && fixnum == 0; }
+  inline auto TP() { return type == kT && fixnum == 0; }
+
+  auto ToString() -> std::string;
+};
+
+struct LishpObject {
+  enum Types {
+    kCons,
+    kString,
+    kSymbol,
+    kFunction,
+    kReadtable,
+    kStream,
+  };
+
+  LishpObject(Types type) : type(type) {}
+
+  Types type;
+
+  template <typename T,
+            std::enable_if_t<std::is_base_of_v<LishpObject, T>, int> = 0>
+  inline auto As() {
+    return (T *)this;
+  }
+};
+
+struct LishpCons : public LishpObject {
+  LishpCons(LishpForm car, LishpForm cdr)
+      : LishpObject(kCons), car(car), cdr(cdr) {}
+
+  LishpForm car;
+  LishpForm cdr;
+};
+
+template <typename T> inline auto LishpForm::AssertAs() -> T * {
+  assert(type == kObject);
+  T *obj = object->As<T>();
+  return obj;
+}
+
+// A list is not an object, I'm using it as a wrapper for either NIL or a
+// cons, so that functions that expect a list, can recieve either a cons or
+// nil
+struct LishpList {
+  bool nil;
+  LishpCons *cons;
+
+  static inline auto Nil() { return LishpList{true, nullptr}; }
+  static inline auto Of(LishpCons *cons) { return LishpList{false, cons}; }
+
+  inline auto first() {
+    if (nil) {
+      return LishpForm::Nil();
+    }
+    return cons->car;
+  }
+
+  inline auto rest() {
+    if (nil) {
+      return *this;
+    }
+
+    LishpForm cdr = cons->cdr;
+    if (cdr.NilP()) {
+      return LishpList::Nil();
+    }
+
+    assert(cdr.type == LishpForm::Types::kObject);
+
+    LishpObject *obj = cdr.object;
+    assert(obj->type == LishpObject::Types::kCons);
+
+    LishpCons *cdr_cons = obj->As<LishpCons>();
+    return LishpList::Of(cdr_cons);
+  }
+
+  inline auto to_form() {
+    if (nil) {
+      return LishpForm::Nil();
+    }
+    return LishpForm::FromObj(cons);
+  }
+
+  template <typename T>
+  static inline auto Push(memory::MemoryManager *manager, T first,
+                          LishpList rest) {
+    LishpForm rest_form = rest.to_form();
+    LishpForm first_form = ToLishpForm(first);
+    LishpCons *new_cons = manager->Allocate<LishpCons>(first_form, rest_form);
+
+    return LishpList::Of(new_cons);
+  }
+
+  template <typename Arg, typename... Args>
+  static auto Build(memory::MemoryManager *manager, Arg first, Args... rest) {
+    LishpList rest_list = Build(manager, rest...);
+    return LishpList::Push(manager, first, rest_list);
+  }
+
+  template <typename Arg>
+  static inline auto Build(memory::MemoryManager *manager, Arg first) {
+    LishpList rest_list = LishpList::Nil();
+    return LishpList::Push(manager, first, rest_list);
+  }
+
+  inline auto Reverse(memory::MemoryManager *manager) {
+    return ReverseR(manager, *this, LishpList::Nil());
+  }
+
+private:
+  static inline auto ToLishpForm(LishpForm arg) -> LishpForm { return arg; }
+
+  static inline auto ToLishpForm(LishpObject *arg) -> LishpForm {
+    return LishpForm::FromObj(arg);
+  }
+
+  static auto ReverseR(memory::MemoryManager *manager, LishpList target,
+                       LishpList cur) -> LishpList {
+    if (target.nil) {
+      return cur;
+    }
+    return ReverseR(manager, target.rest(), Push(manager, target.first(), cur));
+  }
+};
+
+struct LishpString : public LishpObject {
+  LishpString(std::string &&lexeme)
+      : LishpObject(kString), lexeme(std::move(lexeme)) {}
+
+  std::string lexeme;
+};
+
+struct LishpSymbol : public LishpObject {
+  LishpSymbol(const std::string &lexeme)
+      : LishpObject(kSymbol), lexeme(lexeme) {}
+
+  std::string lexeme;
+};
+
+struct LishpFunctionReturn {
+  std::vector<LishpForm> values;
+
+  static inline auto FromValues(LishpForm args...) {
+    return LishpFunctionReturn{std::vector<LishpForm>{args}};
+  }
+};
+
+typedef LishpFunctionReturn (*InherentFunctionPtr)(
+    environment::Environment *env, LishpList &args);
+
+struct LishpFunction : public LishpObject {
+  enum FuncTypes {
+    kInherent,
+    kSpecialForm,
+    kUserDefined,
+  };
+
+  LishpFunction(LishpList body)
+      : LishpObject(kFunction), function_type(kUserDefined), body(body) {}
+  LishpFunction(InherentFunctionPtr inherent)
+      : LishpObject(kFunction), function_type(kInherent), inherent(inherent) {}
+
+  FuncTypes function_type;
+  union {
+    InherentFunctionPtr inherent;
+    LishpList body;
+  };
+
+  auto Call(environment::Environment *env, LishpList &args)
+      -> LishpFunctionReturn;
+};
+
+struct LishpReadtable : public LishpObject {
+  enum Case {
+    kUpcase,
+    kDowncase,
+    kPreserve,
+    kInvert,
+  };
+
+  LishpReadtable(Case readcase) : LishpObject(kReadtable), readcase(readcase) {}
+  LishpReadtable() : LishpObject(kReadtable), readcase(kUpcase) {}
+
+  static inline auto CasedChar(char c) {
+    (void)c;
+    // TODO: impl
+    return false;
+  }
+
+  static inline auto CharCase(char c) {
+    // Assumes the input is a cased character
+    if (c >= 'A' && c <= 'Z') {
+      return kUpcase;
+    }
+    return kDowncase;
+  }
+
+  static inline auto ToUpper(char c) {
+    if (c >= 'a' && c <= 'z') {
+      return (char)(c - 'a' + 'A');
+    }
+    return c;
+  }
+
+  static inline auto ToLower(char c) {
+    if (c >= 'A' && c <= 'Z') {
+      return (char)(c - 'A' + 'a');
+    }
+    return c;
+  }
+
+  inline auto ConvertCase(char c) {
+    if (!CasedChar(c)) {
+      return c;
+    }
+
+    switch (readcase) {
+    case kUpcase:
+      return ToUpper(c);
+    case kDowncase:
+      return ToLower(c);
+    case kPreserve:
+      return c;
+    case kInvert:
+      switch (CharCase(c)) {
+      case kUpcase:
+        return ToLower(c);
+      case kDowncase:
+        return ToUpper(c);
+      default:
+        assert(0 && "Unreachable");
+      }
+    }
+  }
+
+  inline auto InstallMacroChar(char c, LishpFunction *macro_func) -> void {
+    reader_macro_functions.insert({c, macro_func});
+  }
+
+  std::map<char, LishpFunction *> reader_macro_functions;
+  Case readcase;
+};
+
+struct LishpStream : public LishpObject {
+  enum StreamType {
+    kInput,
+    kOutput,
+    kInputOutput,
+  };
+
+  LishpStream(StreamType stream_type)
+      : LishpObject(kStream), stream_type(stream_type) {}
+  StreamType stream_type;
+};
+
+struct LishpIStream : public LishpStream {
+  LishpIStream(std::istream &stm) : LishpStream(kInput), stm(stm) {}
+
+  std::istream &stm;
+
+protected:
+  LishpIStream(StreamType stream_type, std::istream &stm)
+      : LishpStream(stream_type), stm(stm) {}
+};
+
+struct LishpOStream : public LishpStream {
+  LishpOStream(std::ostream &stm) : LishpStream(kOutput), stm(stm) {}
+
+  std::ostream &stm;
+
+protected:
+  LishpOStream(StreamType stream_type, std::ostream &stm)
+      : LishpStream(stream_type), stm(stm) {}
+};
+
+// TODO: pray this doesn't break. I don't really know how to deal with diamond
+// pattern...
+struct LishpIOStream : public LishpIStream, public LishpOStream {
+  LishpIOStream(std::iostream &stm)
+      : LishpIStream(kInputOutput, stm), LishpOStream(kInputOutput, stm),
+        stm(stm) {}
+
+  std::iostream &stm;
+};
+
+} // namespace types
+
+#endif

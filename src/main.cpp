@@ -2,32 +2,34 @@
 
 #include "lishp/lishp.hpp"
 
-void interpret();
-void compile_file(char const *filename);
-void usage();
+auto Interpret() -> void;
+auto CompileFile(char const *filename) -> void;
+auto Usage() -> void;
 
 int main(int argc, char const *argv[]) {
   switch (argc) {
   case 1: {
-    interpret();
+    Interpret();
   } break;
   case 2: {
-    compile_file(argv[1]);
+    CompileFile(argv[1]);
   } break;
   default: {
-    usage();
+    Usage();
     return 1;
   }
   }
   return 0;
 }
 
-void interpret() {
-  LishpRuntime rt;
+auto Interpret() -> void {
   // run the REPL until quit by the user.
-  rt.repl();
+  lishp::RuntimeRepl();
 }
 
-void compile_file(char const *filename) {}
+auto CompileFile(char const *filename) -> void {
+  std::string wrapped_filename(filename);
+  lishp::CompileFile(wrapped_filename);
+}
 
-void usage() { std::cerr << "Usage: ./lishp [filename]" << std::endl; }
+auto Usage() -> void { std::cerr << "Usage: ./lishp [filename]" << std::endl; }
