@@ -2,11 +2,22 @@
 #include "package.hpp"
 
 static auto EvalCons(environment::Environment *env, types::LishpCons *cons) {
-  return types::LishpFunctionReturn::FromValues(types::LishpForm::Nil());
+  types::LishpForm car = cons->car;
+  types::LishpSymbol *func_sym = car.AssertAs<types::LishpSymbol>();
+
+  types::LishpFunction *func = env->SymbolFunction(func_sym);
+
+  types::LishpForm cdr = cons->cdr;
+  types::LishpList args_list = types::LishpList::Nil();
+  if (!cdr.NilP()) {
+    args_list = types::LishpList::Of(cdr.AssertAs<types::LishpCons>());
+  }
+  return func->Call(env, args_list);
 }
 
-static auto EvalSymbol(environment::Environment *env, types::LishpCons *cons) {
-  return types::LishpFunctionReturn::FromValues(types::LishpForm::Nil());
+static auto EvalSymbol(environment::Environment *env, types::LishpSymbol *sym) {
+  types::LishpForm value = env->SymbolValue(sym);
+  return types::LishpFunctionReturn::FromValues(value);
 }
 
 static auto EvalObject(environment::Environment *env,
@@ -16,7 +27,7 @@ static auto EvalObject(environment::Environment *env,
     return EvalCons(env, object->As<types::LishpCons>());
   }
   case types::LishpObject::kSymbol: {
-    return EvalSymbol(env, object->As<types::LishpCons>());
+    return EvalSymbol(env, object->As<types::LishpSymbol>());
   }
   case types::LishpObject::kStream:
   case types::LishpObject::kString:

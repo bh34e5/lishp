@@ -45,6 +45,24 @@ auto Environment::SymbolFunction(types::LishpSymbol *sym)
   assert(0 && "Symbol is not bound to a value in this package.");
 }
 
+auto Environment::MarkTag(types::LishpForm form, types::LishpList head)
+    -> void {
+  tag_markers_.insert({form, head});
+}
+
+auto Environment::FindTag(types::LishpForm form, types::LishpList *res)
+    -> bool {
+  using it_t = decltype(tag_markers_)::iterator;
+
+  it_t found = tag_markers_.find(form);
+  if (found == tag_markers_.end()) {
+    return false;
+  }
+
+  *res = found->second;
+  return true;
+}
+
 auto Environment::BindValue(types::LishpSymbol *sym, types::LishpForm value,
                             bool bind_here) -> bool {
   using it_t = decltype(symbol_values_)::iterator;

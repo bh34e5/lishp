@@ -24,6 +24,8 @@ public:
 
   auto SymbolValue(types::LishpSymbol *sym) -> types::LishpForm;
   auto SymbolFunction(types::LishpSymbol *sym) -> types::LishpFunction *;
+  auto MarkTag(types::LishpForm form, types::LishpList head) -> void;
+  auto FindTag(types::LishpForm form, types::LishpList *res) -> bool;
 
   inline auto BindValue(types::LishpSymbol *sym, types::LishpForm value) {
     BindValue(sym, value, true);
@@ -45,7 +47,7 @@ private:
   std::map<types::LishpSymbol *, types::LishpForm> symbol_values_;
   std::map<types::LishpSymbol *, types::LishpFunction *> symbol_functions_;
 
-  std::map<types::LishpSymbol *, types::LishpList> tag_markers_;
+  std::map<types::LishpForm, types::LishpList> tag_markers_;
   std::set<types::LishpSymbol *> dynamic_symbols_;
 
   Environment *parent_;

@@ -44,6 +44,10 @@ public:
     return InternSymbol(std::move(copy));
   }
 
+  inline auto BindValue(types::LishpSymbol *sym, types::LishpForm form) {
+    global_->BindValue(sym, form);
+  }
+
   inline auto BindFunction(types::LishpSymbol *sym,
                            types::LishpFunction *func) {
     global_->BindFunction(sym, func);

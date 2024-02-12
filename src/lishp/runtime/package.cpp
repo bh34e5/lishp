@@ -3,16 +3,6 @@
 #include "functions/inherents.hpp"
 #include "package.hpp"
 
-#define DEFINE_PACKAGE_FUNCTION(manager, package_ns, package_var,              \
-                                func_sym_lex, func_name)                       \
-  do {                                                                         \
-    types::LishpFunction *func = manager->Allocate<types::LishpFunction>(      \
-        &inherents::package_ns::func_name);                                    \
-                                                                               \
-    types::LishpSymbol *sym = package_var->InternSymbol(func_sym_lex);         \
-    package_var->BindFunction(sym, func);                                      \
-  } while (0)
-
 namespace runtime {
 
 auto Package::InternSymbol(std::string &&lexeme) -> types::LishpSymbol * {
@@ -42,6 +32,22 @@ auto Package::SymbolFunction(types::LishpSymbol *sym)
   return global_->SymbolFunction(sym);
 }
 
+#define DEFINE_PACKAGE_FUNCTION(manager, package_ns, package_var,              \
+                                func_sym_lex, func_name)                       \
+  do {                                                                         \
+    types::LishpFunction *func = manager->Allocate<types::LishpFunction>(      \
+        &inherents::package_ns::func_name);                                    \
+                                                                               \
+    types::LishpSymbol *sym = package_var->InternSymbol(func_sym_lex);         \
+    package_var->BindFunction(sym, func);                                      \
+  } while (0)
+
+#define ESTABLISH_BINDING(package_var, sym_lex, sym_val)                       \
+  do {                                                                         \
+    types::LishpSymbol *sym = package_var->InternSymbol(sym_lex);              \
+    package_var->BindValue(sym, sym_val);                                      \
+  } while (0)
+
 auto BuildSystemPackage(memory::MemoryManager *manager) -> Package * {
   Package *sys = manager->Allocate<Package>("SYSTEM", manager);
 
@@ -65,9 +71,19 @@ auto BuildUserPackage(memory::MemoryManager *manager) -> Package * {
   DEFINE_PACKAGE_FUNCTION(manager, user, user, "READ-CHAR", ReadChar);
   DEFINE_PACKAGE_FUNCTION(manager, user, user, "FORMAT", Format);
 
+  // special forms
+
+  DEFINE_PACKAGE_FUNCTION(manager, special_forms, user, "TAGBODY", Tagbody);
+
+  // root bindings of values
+
+  ESTABLISH_BINDING(user, "NIL", types::LishpForm::Nil());
+  ESTABLISH_BINDING(user, "T", types::LishpForm::T());
+
   return user;
 }
 
+#undef ESTABLISH_BINDING
 #undef DEFINE_PACKAGE_FUNCTION
 
 auto BuildSystemReadtable(memory::MemoryManager *manager)

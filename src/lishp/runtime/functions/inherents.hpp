@@ -26,6 +26,12 @@ DECLARE_FUNCTION(Format);
 
 } // namespace user
 
+namespace special_forms {
+
+DECLARE_FUNCTION(Tagbody);
+
+}
+
 } // namespace inherents
 
 #endif

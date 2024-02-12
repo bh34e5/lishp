@@ -18,7 +18,26 @@ class Environment;
 
 namespace types {
 
-struct LishpObject;
+struct LishpObject {
+  enum Types {
+    kCons,
+    kString,
+    kSymbol,
+    kFunction,
+    kReadtable,
+    kStream,
+  };
+
+  LishpObject(Types type) : type(type) {}
+
+  Types type;
+
+  template <typename T,
+            std::enable_if_t<std::is_base_of_v<LishpObject, T>, int> = 0>
+  inline auto As() {
+    return (T *)this;
+  }
+};
 
 struct LishpForm {
   enum Types {
@@ -48,27 +67,29 @@ struct LishpForm {
   inline auto NilP() { return type == kNil && fixnum == 0; }
   inline auto TP() { return type == kT && fixnum == 0; }
 
-  auto ToString() -> std::string;
-};
-
-struct LishpObject {
-  enum Types {
-    kCons,
-    kString,
-    kSymbol,
-    kFunction,
-    kReadtable,
-    kStream,
+  inline auto ConsP() {
+    return type == kObject && object->type == LishpObject::kCons;
   };
+  inline auto AtomP() { return !ConsP(); }
 
-  LishpObject(Types type) : type(type) {}
+  auto ToString() -> std::string;
 
-  Types type;
+  friend bool operator<(const LishpForm &lhs, const LishpForm &rhs) {
+    if (lhs.type != rhs.type) {
+      return lhs.type - rhs.type;
+    }
 
-  template <typename T,
-            std::enable_if_t<std::is_base_of_v<LishpObject, T>, int> = 0>
-  inline auto As() {
-    return (T *)this;
+    switch (lhs.type) {
+    case LishpForm::kNil:
+    case LishpForm::kT:
+      return true;
+    case LishpForm::kChar:
+      return lhs.ch < rhs.ch;
+    case LishpForm::kFixnum:
+      return lhs.fixnum - rhs.fixnum;
+    case LishpForm::kObject:
+      return lhs.object < rhs.object;
+    }
   }
 };
 
@@ -186,10 +207,31 @@ struct LishpSymbol : public LishpObject {
 };
 
 struct LishpFunctionReturn {
+  enum Types {
+    kGoto,
+    kValues,
+  };
+
+  LishpFunctionReturn(std::vector<LishpForm> &&values)
+      : type(kValues), goto_tag(LishpForm::Nil()), values(std::move(values)) {}
+  LishpFunctionReturn(LishpForm goto_tag) : type(kGoto), goto_tag(goto_tag) {}
+  LishpFunctionReturn(LishpFunctionReturn &&other) {
+    std::swap(type, other.type);
+    std::swap(goto_tag, other.goto_tag);
+    std::swap(values, other.values);
+  }
+
+  Types type;
+
+  LishpForm goto_tag;
   std::vector<LishpForm> values;
 
   static inline auto FromValues(LishpForm args...) {
-    return LishpFunctionReturn{std::vector<LishpForm>{args}};
+    return LishpFunctionReturn(std::vector<LishpForm>{args});
+  }
+
+  static inline auto FromGoto(LishpForm goto_tag) {
+    return LishpFunctionReturn(goto_tag);
   }
 };
 
@@ -230,9 +272,7 @@ struct LishpReadtable : public LishpObject {
   LishpReadtable() : LishpObject(kReadtable), readcase(kUpcase) {}
 
   static inline auto CasedChar(char c) {
-    (void)c;
-    // TODO: impl
-    return false;
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
   }
 
   static inline auto CharCase(char c) {

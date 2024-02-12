@@ -13,7 +13,15 @@ public:
     kInvalid,
   };
 
-  inline auto AddCharacter(char c) { buf_.push_back(c); }
+  Token(types::LishpReadtable *rt) : rt_(rt) {}
+
+  inline auto AddCharacter(char c) {
+    if (rt_->CasedChar(c)) {
+      buf_.push_back(rt_->ConvertCase(c));
+      return;
+    }
+    buf_.push_back(c);
+  }
   inline auto GetBuffer() { return std::move(buf_); }
 
   inline auto GetType(bool had_escape) {
@@ -27,6 +35,7 @@ public:
   }
 
 private:
+  types::LishpReadtable *rt_;
   std::string buf_;
 };
 
@@ -118,10 +127,10 @@ auto GetCharTraits(types::LishpReadtable *rt, char c) {
 }
 
 auto Reader::ReadForm() -> types::LishpForm {
-  Token cur_token;
-  bool had_escape = false;
-
   types::LishpReadtable *rt = GetReadtable();
+
+  Token cur_token(rt);
+  bool had_escape = false;
 
 step_1:
   char x = stm_.get();
@@ -169,7 +178,6 @@ step_1:
     goto step_9;
   }
   case kConstituent: {
-    // TODO: replace the case of x if necessary
     cur_token.AddCharacter(x);
 
   step_8 : {
@@ -181,7 +189,6 @@ step_1:
     switch (GetCharTraits(rt, y)) {
     case kConstituent:
     case kNonTerminatingMacroCharacter:
-      // TODO: replace case of y if necessary
       cur_token.AddCharacter(y);
       goto step_8;
     case kSingleEscape: {
