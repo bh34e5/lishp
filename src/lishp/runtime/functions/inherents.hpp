@@ -14,6 +14,7 @@ namespace system {
 DECLARE_FUNCTION(Repl);
 DECLARE_FUNCTION(ReadOpenParen);
 DECLARE_FUNCTION(ReadCloseParen);
+DECLARE_FUNCTION(ReadDoubleQuote);
 
 } // namespace system
 

@@ -121,6 +121,82 @@ auto ReadCloseParen(environment::Environment *, types::LishpList &)
   throw std::runtime_error("Cannot have ')' in a form... or something");
 }
 
+static auto EscapeChar(char c) {
+  switch (c) {
+  case 'a':
+    return '\a';
+  case 'b':
+    return '\b';
+  case 'f':
+    return '\f';
+  case 'n':
+    return '\n';
+  case 'r':
+    return '\r';
+  case 't':
+    return '\t';
+  case 'v':
+    return '\v';
+  case '0':
+    return '\0';
+  case '1':
+    return '\1';
+  case '2':
+    return '\2';
+  case '3':
+    return '\3';
+  case '4':
+    return '\4';
+  case '5':
+    return '\5';
+  case '6':
+    return '\6';
+  case '7':
+    return '\7';
+  case '?':
+    return '\?';
+  default:
+    return c;
+  }
+}
+
+auto ReadDoubleQuote(environment::Environment *env, types::LishpList &args)
+    -> types::LishpFunctionReturn {
+  // get the stream
+  types::LishpForm stream_form = args.first();
+  types::LishpIStream *stm_obj = stream_form.AssertAs<types::LishpIStream>();
+
+  std::istream &stm = stm_obj->stm;
+  std::string builder;
+
+  bool escaped_next = false;
+  while (true) {
+    char c = stm.get();
+
+    if (c == '\"' && !escaped_next) {
+      break;
+    } else if (c == '\\' && !escaped_next) {
+      escaped_next = true;
+      continue;
+    } else if (escaped_next) {
+      // handle escape characters
+      builder.push_back(EscapeChar(c));
+    } else {
+      builder.push_back(c);
+    }
+
+    escaped_next = false;
+  }
+
+  memory::MemoryManager *manager = env->package()->manager();
+
+  types::LishpString *str_obj =
+      manager->Allocate<types::LishpString>(std::move(builder));
+
+  return types::LishpFunctionReturn::FromValues(
+      types::LishpForm::FromObj(str_obj));
+}
+
 } // namespace system
 
 } // namespace inherents

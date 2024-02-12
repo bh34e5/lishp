@@ -50,6 +50,8 @@ auto BuildSystemPackage(memory::MemoryManager *manager) -> Package * {
                           ReadOpenParen);
   DEFINE_PACKAGE_FUNCTION(manager, system, sys, "READ-CLOSE-PAREN",
                           ReadCloseParen);
+  DEFINE_PACKAGE_FUNCTION(manager, system, sys, "READ-DOUBLE-QUOTE",
+                          ReadDoubleQuote);
 
   return sys;
 }
@@ -81,8 +83,7 @@ auto BuildSystemReadtable(memory::MemoryManager *manager)
 
   INSTALL_MACRO_CHAR('(', system, ReadOpenParen);
   INSTALL_MACRO_CHAR(')', system, ReadCloseParen);
-  // TODO:
-  // INSTALL_MACRO_CHAR('"', ReadString);
+  INSTALL_MACRO_CHAR('"', system, ReadDoubleQuote);
 
   return rt;
 #undef INSTALL_MACRO_CHAR
