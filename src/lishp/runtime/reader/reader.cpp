@@ -149,7 +149,7 @@ step_1:
   case kNonTerminatingMacroCharacter: {
     // TODO: lookup macro function and call it
 
-    memory::MemoryManager *manager = env_->package()->manager();
+    memory::MemoryManager *manager = closure_->package()->manager();
 
     types::LishpIStream *stream_obj =
         manager->Allocate<types::LishpIStream>(stm_);
@@ -158,7 +158,7 @@ step_1:
         manager, stream_obj, types::LishpForm::FromChar(x));
 
     types::LishpFunction *macro_function = rt->reader_macro_functions.at(x);
-    types::LishpFunctionReturn ret = macro_function->Call(env_, args);
+    types::LishpFunctionReturn ret = macro_function->Call(lexical_, args);
 
     if (ret.values.size() == 0) {
       goto step_1;
@@ -254,7 +254,11 @@ step_1:
 step_10:
   switch (cur_token.GetType(had_escape)) {
   case Token::kSymbol: {
-    runtime::Package *package = env_->package();
+    // TODO: It should probably intern into the package into which it is being
+    // read? Actually, this reminds me that I am not handling the package
+    // qualified symbols either... tbf, I'm not handling really anything
+    // correctly yet :P
+    runtime::Package *package = lexical_->package();
     types::LishpSymbol *new_symbol =
         package->InternSymbol(cur_token.GetBuffer());
 

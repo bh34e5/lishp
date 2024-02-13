@@ -236,7 +236,8 @@ struct LishpFunctionReturn {
 };
 
 typedef LishpFunctionReturn (*InherentFunctionPtr)(
-    environment::Environment *env, LishpList &args);
+    environment::Environment *closure, environment::Environment *lexical,
+    LishpList &args);
 
 struct LishpFunction : public LishpObject {
   enum FuncTypes {
@@ -245,18 +246,21 @@ struct LishpFunction : public LishpObject {
     kUserDefined,
   };
 
-  LishpFunction(LishpList body)
-      : LishpObject(kFunction), function_type(kUserDefined), body(body) {}
-  LishpFunction(InherentFunctionPtr inherent)
-      : LishpObject(kFunction), function_type(kInherent), inherent(inherent) {}
+  LishpFunction(environment::Environment *closure, LishpList body)
+      : LishpObject(kFunction), function_type(kUserDefined), closure(closure),
+        body(body) {}
+  LishpFunction(environment::Environment *closure, InherentFunctionPtr inherent)
+      : LishpObject(kFunction), function_type(kInherent), closure(closure),
+        inherent(inherent) {}
 
   FuncTypes function_type;
+  environment::Environment *closure;
   union {
     InherentFunctionPtr inherent;
     LishpList body;
   };
 
-  auto Call(environment::Environment *env, LishpList &args)
+  auto Call(environment::Environment *lexical, LishpList &args)
       -> LishpFunctionReturn;
 };
 

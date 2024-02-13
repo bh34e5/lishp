@@ -9,9 +9,7 @@ auto LishpRuntime::Repl() -> void {
   Package *system_package = FindPackageByName("SYSTEM");
   Package *user_package = FindPackageByName("USER");
 
-  types::LishpSymbol *repl_sym = system_package->InternSymbol("REPL");
-  types::LishpFunction *repl_function =
-      system_package->SymbolFunction(repl_sym);
+  types::LishpFunction *repl_function = system_package->SymbolFunction("REPL");
 
   types::LishpList args_list = types::LishpList::Nil();
   // NOTE: This is kinda scuffed... calling a system function in the context of
@@ -20,12 +18,12 @@ auto LishpRuntime::Repl() -> void {
 }
 
 auto LishpRuntime::Initialize() -> void {
-  default_readtable_ = BuildSystemReadtable(&manager_);
+  Package *system = BuildSystemPackage(this, &manager_);
+  Package *user = BuildUserPackage(this, &manager_);
 
-  Package *system = BuildSystemPackage(&manager_);
+  default_readtable_ = BuildDefaultReadtable(system);
+
   InitializePackage(system);
-
-  Package *user = BuildUserPackage(&manager_);
   InitializePackage(user);
 }
 

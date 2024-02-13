@@ -4,7 +4,8 @@
 #include "../types.hpp"
 
 #define DECLARE_FUNCTION(f_name)                                               \
-  auto f_name(environment::Environment *env, types::LishpList &args)           \
+  auto f_name(environment::Environment *closure,                               \
+              environment::Environment *lexical, types::LishpList &args)       \
       ->types::LishpFunctionReturn
 
 namespace inherents {

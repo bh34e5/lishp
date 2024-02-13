@@ -19,16 +19,17 @@ static auto IStreamFromForm(types::LishpForm form) -> std::istream & {
 
 } // namespace impl
 
-auto Read(environment::Environment *env, types::LishpList &args)
-    -> types::LishpFunctionReturn {
+auto Read(environment::Environment *closure, environment::Environment *lexical,
+          types::LishpList &args) -> types::LishpFunctionReturn {
   types::LishpForm first_form = args.first();
   std::istream &stm = impl::IStreamFromForm(first_form);
 
-  reader::Reader reader(stm, env);
+  reader::Reader reader(stm, closure, lexical);
   return types::LishpFunctionReturn::FromValues(reader.ReadForm());
 }
 
-auto ReadChar(environment::Environment *env, types::LishpList &args)
+auto ReadChar(environment::Environment *closure,
+              environment::Environment *lexical, types::LishpList &args)
     -> types::LishpFunctionReturn {
   types::LishpForm stream_form = args.first();
   types::LishpIStream *stm_obj = stream_form.AssertAs<types::LishpIStream>();
@@ -38,7 +39,8 @@ auto ReadChar(environment::Environment *env, types::LishpList &args)
   return types::LishpFunctionReturn::FromValues(types::LishpForm::FromChar(x));
 }
 
-auto Format(environment::Environment *env, types::LishpList &args)
+auto Format(environment::Environment *closure,
+            environment::Environment *lexical, types::LishpList &args)
     -> types::LishpFunctionReturn {
   types::LishpForm o_stream = args.first();
   types::LishpList rest = args.rest();

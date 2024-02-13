@@ -32,11 +32,11 @@ auto Package::SymbolFunction(types::LishpSymbol *sym)
   return global_->SymbolFunction(sym);
 }
 
-#define DEFINE_PACKAGE_FUNCTION(manager, package_ns, package_var,              \
+#define DEFINE_PACKAGE_FUNCTION(manager, package_ns, package_var, global_env,  \
                                 func_sym_lex, func_name)                       \
   do {                                                                         \
     types::LishpFunction *func = manager->Allocate<types::LishpFunction>(      \
-        &inherents::package_ns::func_name);                                    \
+        global_env, &inherents::package_ns::func_name);                        \
                                                                                \
     types::LishpSymbol *sym = package_var->InternSymbol(func_sym_lex);         \
     package_var->BindFunction(sym, func);                                      \
@@ -48,32 +48,37 @@ auto Package::SymbolFunction(types::LishpSymbol *sym)
     package_var->BindValue(sym, sym_val);                                      \
   } while (0)
 
-auto BuildSystemPackage(memory::MemoryManager *manager) -> Package * {
-  Package *sys = manager->Allocate<Package>("SYSTEM", manager);
+auto BuildSystemPackage(LishpRuntime *runtime, memory::MemoryManager *manager)
+    -> Package * {
+  Package *sys = manager->Allocate<Package>("SYSTEM", runtime, manager);
+  environment::Environment *global = sys->global_env();
 
-  DEFINE_PACKAGE_FUNCTION(manager, system, sys, "REPL", Repl);
-  DEFINE_PACKAGE_FUNCTION(manager, system, sys, "READ-OPEN-PAREN",
+  DEFINE_PACKAGE_FUNCTION(manager, system, sys, global, "REPL", Repl);
+  DEFINE_PACKAGE_FUNCTION(manager, system, sys, global, "READ-OPEN-PAREN",
                           ReadOpenParen);
-  DEFINE_PACKAGE_FUNCTION(manager, system, sys, "READ-CLOSE-PAREN",
+  DEFINE_PACKAGE_FUNCTION(manager, system, sys, global, "READ-CLOSE-PAREN",
                           ReadCloseParen);
-  DEFINE_PACKAGE_FUNCTION(manager, system, sys, "READ-DOUBLE-QUOTE",
+  DEFINE_PACKAGE_FUNCTION(manager, system, sys, global, "READ-DOUBLE-QUOTE",
                           ReadDoubleQuote);
 
   return sys;
 }
 
-auto BuildUserPackage(memory::MemoryManager *manager) -> Package * {
-  Package *user = manager->Allocate<Package>("USER", manager);
+auto BuildUserPackage(LishpRuntime *runtime, memory::MemoryManager *manager)
+    -> Package * {
+  Package *user = manager->Allocate<Package>("USER", runtime, manager);
+  environment::Environment *global = user->global_env();
 
   // TODO: fill this up with a lot of functions...
 
-  DEFINE_PACKAGE_FUNCTION(manager, user, user, "READ", Read);
-  DEFINE_PACKAGE_FUNCTION(manager, user, user, "READ-CHAR", ReadChar);
-  DEFINE_PACKAGE_FUNCTION(manager, user, user, "FORMAT", Format);
+  DEFINE_PACKAGE_FUNCTION(manager, user, user, global, "READ", Read);
+  DEFINE_PACKAGE_FUNCTION(manager, user, user, global, "READ-CHAR", ReadChar);
+  DEFINE_PACKAGE_FUNCTION(manager, user, user, global, "FORMAT", Format);
 
   // special forms
 
-  DEFINE_PACKAGE_FUNCTION(manager, special_forms, user, "TAGBODY", Tagbody);
+  DEFINE_PACKAGE_FUNCTION(manager, special_forms, user, global, "TAGBODY",
+                          Tagbody);
 
   // root bindings of values
 
@@ -86,20 +91,19 @@ auto BuildUserPackage(memory::MemoryManager *manager) -> Package * {
 #undef ESTABLISH_BINDING
 #undef DEFINE_PACKAGE_FUNCTION
 
-auto BuildSystemReadtable(memory::MemoryManager *manager)
-    -> types::LishpReadtable * {
+auto BuildDefaultReadtable(Package *package) -> types::LishpReadtable * {
 #define INSTALL_MACRO_CHAR(c, ns, func_name)                                   \
   do {                                                                         \
-    types::LishpFunction *macro_func =                                         \
-        manager->Allocate<types::LishpFunction>(inherents::ns::func_name);     \
+    types::LishpFunction *macro_func = package->SymbolFunction(func_name);     \
     rt->InstallMacroChar(c, macro_func);                                       \
   } while (0)
 
+  memory::MemoryManager *manager = package->manager();
   types::LishpReadtable *rt = manager->Allocate<types::LishpReadtable>();
 
-  INSTALL_MACRO_CHAR('(', system, ReadOpenParen);
-  INSTALL_MACRO_CHAR(')', system, ReadCloseParen);
-  INSTALL_MACRO_CHAR('"', system, ReadDoubleQuote);
+  INSTALL_MACRO_CHAR('(', system, "READ-OPEN-PAREN");
+  INSTALL_MACRO_CHAR(')', system, "READ-CLOSE-PAREN");
+  INSTALL_MACRO_CHAR('"', system, "READ-DOUBLE-QUOTE");
 
   return rt;
 #undef INSTALL_MACRO_CHAR

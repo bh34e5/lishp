@@ -16,11 +16,11 @@ public:
   ~LishpRuntime() { Uninitialize(); }
 
   auto Repl() -> void;
+  auto FindPackageByName(const std::string &name) -> Package *;
 
 private:
   auto Initialize() -> void;
   auto Uninitialize() -> void;
-  auto FindPackageByName(const std::string &name) -> Package *;
 
   auto InitializePackage(Package *package) -> void;
 

@@ -9,7 +9,7 @@ auto EvalUserDefinedFunction(LishpList &args) -> LishpFunctionReturn {
   assert(0 && "Unimplemented: types::EvalUserDefinedFunction");
 }
 
-auto LishpFunction::Call(environment::Environment *env, LishpList &args)
+auto LishpFunction::Call(environment::Environment *lexical, LishpList &args)
     -> LishpFunctionReturn {
   // TODO: need to add an args check at some point. And I _think_ that should be
   // the responsibility of this call method. I should store information on the
@@ -23,13 +23,13 @@ auto LishpFunction::Call(environment::Environment *env, LishpList &args)
 
   switch (function_type) {
   case kInherent: {
-    LishpList evaled_args = EvalArgs(env, args);
-    return (inherent)(env, evaled_args);
+    LishpList evaled_args = EvalArgs(lexical, args);
+    return (inherent)(closure, lexical, evaled_args);
   } break;
   case kSpecialForm:
-    return (inherent)(env, args);
+    return (inherent)(closure, lexical, args);
   case kUserDefined: {
-    LishpList evaled_args = EvalArgs(env, args);
+    LishpList evaled_args = EvalArgs(lexical, args);
     return EvalUserDefinedFunction(evaled_args);
   } break;
   }

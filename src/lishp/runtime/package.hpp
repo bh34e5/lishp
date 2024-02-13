@@ -10,31 +10,38 @@
 
 namespace runtime {
 
+class LishpRuntime;
+
 class Package {
 public:
   Package() = delete;
-  Package(std::string &&name, memory::MemoryManager *manager)
-      : name_(std::move(name)), manager_(manager) {
+  Package(std::string &&name, LishpRuntime *runtime,
+          memory::MemoryManager *manager)
+      : name_(std::move(name)), runtime_(runtime), manager_(manager) {
     global_ = manager->Allocate<environment::Environment>(this);
   }
   Package(const Package &other) = delete;
   Package(Package &&other) {
     std::swap(name_, other.name_);
     std::swap(interned_symbols_, other.interned_symbols_);
+    runtime_ = other.runtime_;
     manager_ = other.manager_;
     global_ = other.global_;
 
+    other.runtime_ = nullptr;
     other.manager_ = nullptr;
     other.global_ = nullptr;
   };
   ~Package() {
     if (manager_ != nullptr && global_ != nullptr) {
+      runtime_ = nullptr;
       manager_->Deallocate(global_);
       global_ = nullptr;
     }
   };
 
   inline auto name() const -> const std::string & { return name_; }
+  inline auto runtime() { return runtime_; }
   inline auto manager() { return manager_; }
   inline auto global_env() { return global_; }
 
@@ -60,18 +67,31 @@ public:
   auto SymbolValue(types::LishpSymbol *sym) -> types::LishpForm;
   auto SymbolFunction(types::LishpSymbol *sym) -> types::LishpFunction *;
 
+  // utility inlines
+  inline auto SymbolValue(std::string &&lexeme) {
+    types::LishpSymbol *sym = InternSymbol(std::move(lexeme));
+    return SymbolValue(sym);
+  }
+
+  inline auto SymbolFunction(std::string &&lexeme) {
+    types::LishpSymbol *sym = InternSymbol(std::move(lexeme));
+    return SymbolFunction(sym);
+  }
+
 private:
   std::string name_;
   std::map<std::string, types::LishpSymbol *> interned_symbols_;
 
+  LishpRuntime *runtime_;
   memory::MemoryManager *manager_;
   environment::Environment *global_;
 };
 
-auto BuildSystemPackage(memory::MemoryManager *manager) -> Package *;
-auto BuildUserPackage(memory::MemoryManager *manager) -> Package *;
-auto BuildSystemReadtable(memory::MemoryManager *manager)
-    -> types::LishpReadtable *;
+auto BuildSystemPackage(LishpRuntime *runtime, memory::MemoryManager *manager)
+    -> Package *;
+auto BuildUserPackage(LishpRuntime *runtime, memory::MemoryManager *manager)
+    -> Package *;
+auto BuildDefaultReadtable(Package *package) -> types::LishpReadtable *;
 
 } // namespace runtime
 

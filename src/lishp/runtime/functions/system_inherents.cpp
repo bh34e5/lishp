@@ -2,19 +2,26 @@
 
 #include "../evaluation.hpp"
 #include "../package.hpp"
+#include "../runtime.hpp"
 #include "inherents.hpp"
 
 namespace inherents {
 
 namespace system {
 
-auto Repl(environment::Environment *env, types::LishpList &args)
-    -> types::LishpFunctionReturn {
+auto Repl(environment::Environment *closure, environment::Environment *lexical,
+          types::LishpList &args) -> types::LishpFunctionReturn {
   // NOTE: I think, since this is a system function, redefinition is probably
   // either disabled, or it's undefined behavior, so I think I can just make a
   // call to the user read function?
+  runtime::Package *closure_pkg = closure->package();
 
-  memory::MemoryManager *manager = env->package()->manager();
+  memory::MemoryManager *manager = closure_pkg->manager();
+  runtime::LishpRuntime *runtime = closure_pkg->runtime();
+
+  runtime::Package *user_package = runtime->FindPackageByName("USER");
+  types::LishpFunction *user_read = user_package->SymbolFunction("READ");
+  types::LishpFunction *user_format = user_package->SymbolFunction("FORMAT");
 
   types::LishpString *string_arg =
       manager->Allocate<types::LishpString>("~%~a");
@@ -24,12 +31,12 @@ auto Repl(environment::Environment *env, types::LishpList &args)
   bool keep_running = true;
 
   while (keep_running) {
-    types::LishpFunctionReturn form_ret = user::Read(env, nil_args);
+    types::LishpFunctionReturn form_ret = user_read->Call(lexical, nil_args);
 
     // FIXME: need to check all my asserts...
     assert(form_ret.values.size() == 1);
     types::LishpForm form_val = form_ret.values.at(0);
-    types::LishpFunctionReturn evaled_result = EvalForm(env, form_val);
+    types::LishpFunctionReturn evaled_result = EvalForm(lexical, form_val);
 
     assert(evaled_result.values.size() == 1);
     types::LishpForm evaled_form = evaled_result.values.at(0);
@@ -37,7 +44,7 @@ auto Repl(environment::Environment *env, types::LishpList &args)
     types::LishpList format_args_list = types::LishpList::Build(
         manager, types::LishpForm::T(), string_arg, evaled_form);
 
-    user::Format(env, format_args_list);
+    user_format->Call(lexical, format_args_list);
     std::cout << std::endl;
 
     // FIXME: allow infinite looping
@@ -58,12 +65,15 @@ static bool IsWhitespace(const std::string &s, std::streampos pos) {
   return true;
 }
 
-auto ReadOpenParen(environment::Environment *env, types::LishpList &args)
+auto ReadOpenParen(environment::Environment *closure,
+                   environment::Environment *lexical, types::LishpList &args)
     -> types::LishpFunctionReturn {
   types::LishpForm stream_form = args.first();
   types::LishpIStream *stm_obj = stream_form.AssertAs<types::LishpIStream>();
 
-  memory::MemoryManager *manager = env->package()->manager();
+  runtime::Package *closure_pkg = closure->package();
+  memory::MemoryManager *manager = closure_pkg->manager();
+  runtime::LishpRuntime *runtime = closure_pkg->runtime();
 
   std::stringstream sstream(std::ios_base::in | std::ios_base::out);
   types::LishpIStream *sstream_obj =
@@ -92,9 +102,8 @@ auto ReadOpenParen(environment::Environment *env, types::LishpList &args)
     sstream << c;
   }
 
-  types::LishpSymbol *read_sym = env->package()->InternSymbol("READ");
-  types::LishpFunction *read_function =
-      env->package()->SymbolFunction(read_sym);
+  runtime::Package *user_package = runtime->FindPackageByName("USER");
+  types::LishpFunction *user_read = user_package->SymbolFunction("READ");
 
   types::LishpList cur_list = types::LishpList::Nil();
 
@@ -105,7 +114,7 @@ auto ReadOpenParen(environment::Environment *env, types::LishpList &args)
     }
 
     types::LishpFunctionReturn read_res =
-        read_function->Call(env, rec_read_call_args);
+        user_read->Call(lexical, rec_read_call_args);
     assert(read_res.values.size() == 1);
 
     types::LishpForm form = read_res.values.at(0);
@@ -115,8 +124,8 @@ auto ReadOpenParen(environment::Environment *env, types::LishpList &args)
       cur_list.Reverse(manager).to_form());
 }
 
-auto ReadCloseParen(environment::Environment *, types::LishpList &)
-    -> types::LishpFunctionReturn {
+auto ReadCloseParen(environment::Environment *, environment::Environment *,
+                    types::LishpList &) -> types::LishpFunctionReturn {
   // FIXME: figure out the proper way to handle this as well...
   throw std::runtime_error("Cannot have ')' in a form... or something");
 }
@@ -160,7 +169,8 @@ static auto EscapeChar(char c) {
   }
 }
 
-auto ReadDoubleQuote(environment::Environment *env, types::LishpList &args)
+auto ReadDoubleQuote(environment::Environment *closure,
+                     environment::Environment *lexical, types::LishpList &args)
     -> types::LishpFunctionReturn {
   // get the stream
   types::LishpForm stream_form = args.first();
@@ -188,7 +198,7 @@ auto ReadDoubleQuote(environment::Environment *env, types::LishpList &args)
     escaped_next = false;
   }
 
-  memory::MemoryManager *manager = env->package()->manager();
+  memory::MemoryManager *manager = closure->package()->manager();
 
   types::LishpString *str_obj =
       manager->Allocate<types::LishpString>(std::move(builder));

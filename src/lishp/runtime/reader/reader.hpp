@@ -10,18 +10,20 @@ namespace reader {
 
 class Reader {
 public:
-  Reader(std::istream &stm, environment::Environment *env)
-      : stm_(stm), env_(env) {}
+  Reader(std::istream &stm, environment::Environment *closure,
+         environment::Environment *lexical)
+      : stm_(stm), closure_(closure), lexical_(lexical) {}
 
   auto ReadForm() -> types::LishpForm;
 
 private:
   inline auto GetReadtable() {
-    runtime::Package *package = env_->package();
+    // TODO: when I get dynamic variables set up correctly, this is where I am
+    // going to need to pass the lexical scope so that the SymbolValue can
+    // properly find the readtable var
+    runtime::Package *package = closure_->package();
 
-    types::LishpSymbol *rt_sym = package->InternSymbol("*READTABLE*");
-    types::LishpForm rt_form = package->SymbolValue(rt_sym);
-
+    types::LishpForm rt_form = package->SymbolValue("*READTABLE*");
     assert(rt_form.type == types::LishpForm::Types::kObject);
 
     types::LishpObject *obj = rt_form.object;
@@ -32,7 +34,8 @@ private:
   }
 
   std::istream &stm_;
-  environment::Environment *env_;
+  environment::Environment *closure_;
+  environment::Environment *lexical_;
 };
 
 } // namespace reader

@@ -6,9 +6,14 @@ namespace inherents {
 
 namespace special_forms {
 
-auto Tagbody(environment::Environment *env, types::LishpList &args)
-    -> types::LishpFunctionReturn {
-  environment::Environment cur_env(env->package(), env);
+// FIXME: I may need to change the way that I create these... maybe they
+// aren't actually "functions" since they don't have a closure scope... they
+// are only lexical. For now, I think I can get by with just ignoring the
+// closure environment arg and letting it still be the user global...
+
+auto Tagbody(environment::Environment *, environment::Environment *lexical,
+             types::LishpList &args) -> types::LishpFunctionReturn {
+  environment::Environment cur_env(lexical->package(), lexical);
 
   // mark all the tags (so that jumping forward works as well)
 
