@@ -8,6 +8,10 @@
               environment::Environment *lexical, types::LishpList &args)       \
       ->types::LishpFunctionReturn
 
+#define DECLARE_SPECIAL_FORM(sf_name)                                          \
+  auto sf_name(environment::Environment *lexical, types::LishpList &args)      \
+      ->types::LishpFunctionReturn
+
 namespace inherents {
 
 namespace system {
@@ -29,9 +33,11 @@ DECLARE_FUNCTION(Format);
 
 namespace special_forms {
 
-DECLARE_FUNCTION(Tagbody);
+DECLARE_SPECIAL_FORM(Tagbody);
+DECLARE_SPECIAL_FORM(Go);
+DECLARE_SPECIAL_FORM(Quote);
 
-}
+} // namespace special_forms
 
 } // namespace inherents
 

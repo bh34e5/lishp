@@ -36,13 +36,22 @@ auto Repl(environment::Environment *closure, environment::Environment *lexical,
     // FIXME: need to check all my asserts...
     assert(form_ret.values.size() == 1);
     types::LishpForm form_val = form_ret.values.at(0);
-    types::LishpFunctionReturn evaled_result = EvalForm(lexical, form_val);
 
-    assert(evaled_result.values.size() == 1);
-    types::LishpForm evaled_form = evaled_result.values.at(0);
+    if (form_val.ConsP()) {
+      types::LishpForm cons_first = form_val.AssertAs<types::LishpCons>()->car;
+      if (cons_first.type == types::LishpForm::kObject &&
+          cons_first.object->type == types::LishpObject::kSymbol) {
+        types::LishpSymbol *sym = cons_first.AssertAs<types::LishpSymbol>();
+
+        // TODO: add eqls ignore case here
+        if (sym->lexeme == "QUIT") {
+          return {std::vector{types::LishpForm::Nil()}};
+        }
+      }
+    }
 
     types::LishpList format_args_list = types::LishpList::Build(
-        manager, types::LishpForm::T(), string_arg, evaled_form);
+        manager, types::LishpForm::T(), string_arg, form_val);
 
     user_format->Call(lexical, format_args_list);
     std::cout << std::endl;

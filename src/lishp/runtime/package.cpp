@@ -42,6 +42,16 @@ auto Package::SymbolFunction(types::LishpSymbol *sym)
     package_var->BindFunction(sym, func);                                      \
   } while (0)
 
+#define DEFINE_PACKAGE_SPECIAL_FORM(manager, package_ns, package_var,          \
+                                    func_sym_lex, sf_name)                     \
+  do {                                                                         \
+    types::LishpFunction *func = manager->Allocate<types::LishpFunction>(      \
+        &inherents::package_ns::sf_name);                                      \
+                                                                               \
+    types::LishpSymbol *sym = package_var->InternSymbol(func_sym_lex);         \
+    package_var->BindFunction(sym, func);                                      \
+  } while (0)
+
 #define ESTABLISH_BINDING(package_var, sym_lex, sym_val)                       \
   do {                                                                         \
     types::LishpSymbol *sym = package_var->InternSymbol(sym_lex);              \
@@ -77,8 +87,10 @@ auto BuildUserPackage(LishpRuntime *runtime, memory::MemoryManager *manager)
 
   // special forms
 
-  DEFINE_PACKAGE_FUNCTION(manager, special_forms, user, global, "TAGBODY",
-                          Tagbody);
+  // TODO: pull these into a check in eval form... these shouldn't be bound...
+  DEFINE_PACKAGE_SPECIAL_FORM(manager, special_forms, user, "TAGBODY", Tagbody);
+  DEFINE_PACKAGE_SPECIAL_FORM(manager, special_forms, user, "GO", Go);
+  DEFINE_PACKAGE_SPECIAL_FORM(manager, special_forms, user, "QUOTE", Quote);
 
   // root bindings of values
 
@@ -89,6 +101,7 @@ auto BuildUserPackage(LishpRuntime *runtime, memory::MemoryManager *manager)
 }
 
 #undef ESTABLISH_BINDING
+#undef DEFINE_PACKAGE_SPECIAL_FORM
 #undef DEFINE_PACKAGE_FUNCTION
 
 auto BuildDefaultReadtable(Package *package) -> types::LishpReadtable * {

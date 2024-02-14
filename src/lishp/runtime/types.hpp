@@ -208,36 +208,39 @@ struct LishpSymbol : public LishpObject {
 
 struct LishpFunctionReturn {
   enum Types {
-    kGoto,
+    kGo,
     kValues,
   };
 
   LishpFunctionReturn(std::vector<LishpForm> &&values)
-      : type(kValues), goto_tag(LishpForm::Nil()), values(std::move(values)) {}
-  LishpFunctionReturn(LishpForm goto_tag) : type(kGoto), goto_tag(goto_tag) {}
+      : type(kValues), go_tag(LishpForm::Nil()), values(std::move(values)) {}
+  LishpFunctionReturn(LishpForm go_tag) : type(kGo), go_tag(go_tag) {}
   LishpFunctionReturn(LishpFunctionReturn &&other) {
     std::swap(type, other.type);
-    std::swap(goto_tag, other.goto_tag);
+    std::swap(go_tag, other.go_tag);
     std::swap(values, other.values);
   }
 
   Types type;
 
-  LishpForm goto_tag;
+  LishpForm go_tag;
   std::vector<LishpForm> values;
 
   static inline auto FromValues(LishpForm args...) {
     return LishpFunctionReturn(std::vector<LishpForm>{args});
   }
 
-  static inline auto FromGoto(LishpForm goto_tag) {
-    return LishpFunctionReturn(goto_tag);
+  static inline auto FromGo(LishpForm go_tag) {
+    return LishpFunctionReturn(go_tag);
   }
 };
 
 typedef LishpFunctionReturn (*InherentFunctionPtr)(
     environment::Environment *closure, environment::Environment *lexical,
     LishpList &args);
+
+typedef LishpFunctionReturn (*SpecialFormPtr)(environment::Environment *lexical,
+                                              LishpList &args);
 
 struct LishpFunction : public LishpObject {
   enum FuncTypes {
@@ -252,11 +255,15 @@ struct LishpFunction : public LishpObject {
   LishpFunction(environment::Environment *closure, InherentFunctionPtr inherent)
       : LishpObject(kFunction), function_type(kInherent), closure(closure),
         inherent(inherent) {}
+  LishpFunction(SpecialFormPtr special_form)
+      : LishpObject(kFunction), function_type(kSpecialForm), closure(nullptr),
+        special_form(special_form) {}
 
   FuncTypes function_type;
   environment::Environment *closure;
   union {
     InherentFunctionPtr inherent;
+    SpecialFormPtr special_form;
     LishpList body;
   };
 

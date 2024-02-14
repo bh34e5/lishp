@@ -27,7 +27,7 @@ auto LishpFunction::Call(environment::Environment *lexical, LishpList &args)
     return (inherent)(closure, lexical, evaled_args);
   } break;
   case kSpecialForm:
-    return (inherent)(closure, lexical, args);
+    return (special_form)(lexical, args);
   case kUserDefined: {
     LishpList evaled_args = EvalArgs(lexical, args);
     return EvalUserDefinedFunction(evaled_args);
