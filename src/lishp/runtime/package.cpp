@@ -70,6 +70,8 @@ auto BuildSystemPackage(LishpRuntime *runtime, memory::MemoryManager *manager)
                           ReadCloseParen);
   DEFINE_PACKAGE_FUNCTION(manager, system, sys, global, "READ-DOUBLE-QUOTE",
                           ReadDoubleQuote);
+  DEFINE_PACKAGE_FUNCTION(manager, system, sys, global, "READ-SINGLE-QUOTE",
+                          ReadSingleQuote);
 
   return sys;
 }
@@ -112,6 +114,7 @@ auto BuildDefaultReadtable(Package *package) -> types::LishpReadtable * {
   INSTALL_MACRO_CHAR('(', system, "READ-OPEN-PAREN");
   INSTALL_MACRO_CHAR(')', system, "READ-CLOSE-PAREN");
   INSTALL_MACRO_CHAR('"', system, "READ-DOUBLE-QUOTE");
+  INSTALL_MACRO_CHAR('\'', system, "READ-SINGLE-QUOTE");
 
   return rt;
 #undef INSTALL_MACRO_CHAR

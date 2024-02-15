@@ -216,6 +216,31 @@ auto ReadDoubleQuote(environment::Environment *closure,
       types::LishpForm::FromObj(str_obj));
 }
 
+auto ReadSingleQuote(environment::Environment *closure,
+                     environment::Environment *lexical, types::LishpList &args)
+    -> types::LishpFunctionReturn {
+  runtime::Package *closure_pkg = closure->package();
+
+  memory::MemoryManager *manager = closure_pkg->manager();
+  runtime::LishpRuntime *runtime = closure_pkg->runtime();
+
+  runtime::Package *user_package = runtime->FindPackageByName("USER");
+  types::LishpFunction *user_read = user_package->SymbolFunction("READ");
+
+  types::LishpForm stream_form = args.first();
+  types::LishpList read_args = types::LishpList::Build(manager, stream_form);
+
+  types::LishpFunctionReturn read_func_ret =
+      user_read->Call(lexical, read_args);
+  types::LishpForm read_form = read_func_ret.values.at(0);
+
+  types::LishpSymbol *read_sym = user_package->InternSymbol("QUOTE");
+  types::LishpList quote_list =
+      types::LishpList::Build(manager, read_sym, read_form);
+
+  return types::LishpFunctionReturn::FromValues(quote_list.to_form());
+}
+
 } // namespace system
 
 } // namespace inherents
