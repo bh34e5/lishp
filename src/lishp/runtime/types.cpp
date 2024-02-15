@@ -1,12 +1,39 @@
 #include <assert.h>
 
 #include "evaluation.hpp"
+#include "package.hpp"
 #include "types.hpp"
 
 namespace types {
 
-auto EvalUserDefinedFunction(LishpList &args) -> LishpFunctionReturn {
-  assert(0 && "Unimplemented: types::EvalUserDefinedFunction");
+static auto EvalUserDefinedFunction(environment::Environment *closure,
+                                    LishpList defined_args, LishpList body,
+                                    LishpList &evaled_args)
+    -> LishpFunctionReturn {
+  // create a new lexical scope in which the parameters are bound to the args
+  memory::MemoryManager *manager = closure->package()->manager();
+  environment::Environment *call_env =
+      manager->Allocate<environment::Environment>(closure->package(), closure);
+
+  LishpList def_rest = defined_args;
+  LishpList eval_rest = evaled_args;
+
+  while (!def_rest.nil) {
+    // TODO: handle the &command forms for rest, optional, key, etc.
+    LishpForm def_first = def_rest.first();
+    LishpForm eval_first = eval_rest.first();
+
+    LishpSymbol *def_sym = def_first.AssertAs<LishpSymbol>();
+
+    call_env->BindValue(def_sym, eval_first);
+
+    def_rest = def_rest.rest();
+    eval_rest = eval_rest.rest();
+  }
+
+  LishpSymbol *progn_sym = closure->package()->InternSymbol("PROGN");
+  LishpList block = LishpList::Push(manager, progn_sym, body);
+  return EvalForm(call_env, block.to_form());
 }
 
 auto LishpFunction::Call(environment::Environment *lexical, LishpList &args)
@@ -30,7 +57,8 @@ auto LishpFunction::Call(environment::Environment *lexical, LishpList &args)
     return (special_form)(lexical, args);
   case kUserDefined: {
     LishpList evaled_args = EvalArgs(lexical, args);
-    return EvalUserDefinedFunction(evaled_args);
+    return EvalUserDefinedFunction(closure, user_defined.args,
+                                   user_defined.body, evaled_args);
   } break;
   }
 }

@@ -2,11 +2,11 @@
 #include "functions/inherents.hpp"
 #include "package.hpp"
 
-static bool IsSpecialForm(environment::Environment *env,
+static bool IsSpecialForm(environment::Environment *lexical,
                           types::LishpSymbol *sym) {
 #define CHECK_SYM(name)                                                        \
   do {                                                                         \
-    types::LishpSymbol *test_sym = env->package()->InternSymbol(name);         \
+    types::LishpSymbol *test_sym = lexical->package()->InternSymbol(name);     \
     if (sym == test_sym) {                                                     \
       return true;                                                             \
     }                                                                          \
@@ -16,32 +16,40 @@ static bool IsSpecialForm(environment::Environment *env,
   CHECK_SYM("TAGBODY");
   CHECK_SYM("GO");
   CHECK_SYM("QUOTE");
+  CHECK_SYM("FUNCTION");
+  CHECK_SYM("PROGN");
+
   return false;
 
 #undef CHECK_SYM
 }
 
-static auto HandleSpecialForm(environment::Environment *env,
+static auto HandleSpecialForm(environment::Environment *lexical,
                               types::LishpSymbol *form_sym,
                               types::LishpList &args) {
 #define HANDLE_FORM(form_name, FormHandler)                                    \
   do {                                                                         \
-    types::LishpSymbol *handler_sym = env->package()->InternSymbol(form_name); \
+    types::LishpSymbol *handler_sym =                                          \
+        lexical->package()->InternSymbol(form_name);                           \
+                                                                               \
     if (form_sym == handler_sym) {                                             \
-      return inherents::special_forms::FormHandler(env, args);                 \
+      return inherents::special_forms::FormHandler(lexical, args);             \
     }                                                                          \
   } while (0)
 
   HANDLE_FORM("TAGBODY", Tagbody);
   HANDLE_FORM("GO", Go);
   HANDLE_FORM("QUOTE", Quote);
+  HANDLE_FORM("FUNCTION", Function);
+  HANDLE_FORM("PROGN", Progn);
 
   assert(0 && "Form passed is not a special form");
 
 #undef HANDLE_FORM
 }
 
-static auto EvalCons(environment::Environment *env, types::LishpCons *cons) {
+static auto EvalCons(environment::Environment *lexical,
+                     types::LishpCons *cons) {
   types::LishpForm car = cons->car;
   types::LishpSymbol *func_sym = car.AssertAs<types::LishpSymbol>();
 
@@ -51,28 +59,29 @@ static auto EvalCons(environment::Environment *env, types::LishpCons *cons) {
     args_list = types::LishpList::Of(cdr.AssertAs<types::LishpCons>());
   }
 
-  if (IsSpecialForm(env, func_sym)) {
-    return HandleSpecialForm(env, func_sym, args_list);
+  if (IsSpecialForm(lexical, func_sym)) {
+    return HandleSpecialForm(lexical, func_sym, args_list);
   }
 
-  types::LishpFunction *func = env->SymbolFunction(func_sym);
+  types::LishpFunction *func = lexical->SymbolFunction(func_sym);
 
-  return func->Call(env, args_list);
+  return func->Call(lexical, args_list);
 }
 
-static auto EvalSymbol(environment::Environment *env, types::LishpSymbol *sym) {
-  types::LishpForm value = env->SymbolValue(sym);
+static auto EvalSymbol(environment::Environment *lexical,
+                       types::LishpSymbol *sym) {
+  types::LishpForm value = lexical->SymbolValue(sym);
   return types::LishpFunctionReturn::FromValues(value);
 }
 
-static auto EvalObject(environment::Environment *env,
+static auto EvalObject(environment::Environment *lexical,
                        types::LishpObject *object) {
   switch (object->type) {
   case types::LishpObject::kCons: {
-    return EvalCons(env, object->As<types::LishpCons>());
+    return EvalCons(lexical, object->As<types::LishpCons>());
   }
   case types::LishpObject::kSymbol: {
-    return EvalSymbol(env, object->As<types::LishpSymbol>());
+    return EvalSymbol(lexical, object->As<types::LishpSymbol>());
   }
   case types::LishpObject::kStream:
   case types::LishpObject::kString:
@@ -85,7 +94,7 @@ static auto EvalObject(environment::Environment *env,
   }
 }
 
-auto EvalForm(environment::Environment *env, types::LishpForm form)
+auto EvalForm(environment::Environment *lexical, types::LishpForm form)
     -> types::LishpFunctionReturn {
   switch (form.type) {
   case types::LishpForm::kT:
@@ -97,17 +106,17 @@ auto EvalForm(environment::Environment *env, types::LishpForm form)
     return types::LishpFunctionReturn::FromValues(std::move(copy));
   }
   case types::LishpForm::kObject:
-    return EvalObject(env, form.object);
+    return EvalObject(lexical, form.object);
   }
 }
 
-auto EvalArgs(environment::Environment *env, types::LishpList &args)
+auto EvalArgs(environment::Environment *lexical, types::LishpList &args)
     -> types::LishpList {
   if (args.nil) {
     return types::LishpList::Nil();
   }
 
-  types::LishpFunctionReturn evaled_first_fr = EvalForm(env, args.first());
+  types::LishpFunctionReturn evaled_first_fr = EvalForm(lexical, args.first());
   // TODO: this will maybe change?
   // I _think_ the way that I'm using this, this is where I would add nil if
   // empty, and trim to just the first if not... I don't think this is getting
@@ -117,8 +126,8 @@ auto EvalArgs(environment::Environment *env, types::LishpList &args)
   types::LishpForm evaled_first = evaled_first_fr.values.at(0);
 
   types::LishpList rest_list = args.rest();
-  types::LishpList evaled_rest = EvalArgs(env, rest_list);
+  types::LishpList evaled_rest = EvalArgs(lexical, rest_list);
 
-  memory::MemoryManager *manager_ = env->package()->manager();
+  memory::MemoryManager *manager_ = lexical->package()->manager();
   return types::LishpList::Push(manager_, evaled_first, evaled_rest);
 }

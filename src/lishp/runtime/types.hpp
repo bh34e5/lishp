@@ -226,6 +226,10 @@ struct LishpFunctionReturn {
   LishpForm go_tag;
   std::vector<LishpForm> values;
 
+  static inline auto FromValues() {
+    return LishpFunctionReturn(std::vector<LishpForm>{});
+  }
+
   static inline auto FromValues(LishpForm args...) {
     return LishpFunctionReturn(std::vector<LishpForm>{args});
   }
@@ -249,9 +253,10 @@ struct LishpFunction : public LishpObject {
     kUserDefined,
   };
 
-  LishpFunction(environment::Environment *closure, LishpList body)
+  LishpFunction(environment::Environment *closure, LishpList args,
+                LishpList body)
       : LishpObject(kFunction), function_type(kUserDefined), closure(closure),
-        body(body) {}
+        user_defined({args, body}) {}
   LishpFunction(environment::Environment *closure, InherentFunctionPtr inherent)
       : LishpObject(kFunction), function_type(kInherent), closure(closure),
         inherent(inherent) {}
@@ -264,7 +269,10 @@ struct LishpFunction : public LishpObject {
   union {
     InherentFunctionPtr inherent;
     SpecialFormPtr special_form;
-    LishpList body;
+    struct {
+      LishpList args;
+      LishpList body;
+    } user_defined;
   };
 
   auto Call(environment::Environment *lexical, LishpList &args)

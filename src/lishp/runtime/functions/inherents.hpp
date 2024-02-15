@@ -37,6 +37,8 @@ namespace special_forms {
 DECLARE_SPECIAL_FORM(Tagbody);
 DECLARE_SPECIAL_FORM(Go);
 DECLARE_SPECIAL_FORM(Quote);
+DECLARE_SPECIAL_FORM(Function);
+DECLARE_SPECIAL_FORM(Progn);
 
 } // namespace special_forms
 
