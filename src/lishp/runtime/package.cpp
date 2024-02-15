@@ -85,12 +85,7 @@ auto BuildUserPackage(LishpRuntime *runtime, memory::MemoryManager *manager)
   DEFINE_PACKAGE_FUNCTION(manager, user, user, global, "READ-CHAR", ReadChar);
   DEFINE_PACKAGE_FUNCTION(manager, user, user, global, "FORMAT", Format);
 
-  // special forms
-
-  // TODO: pull these into a check in eval form... these shouldn't be bound...
-  DEFINE_PACKAGE_SPECIAL_FORM(manager, special_forms, user, "TAGBODY", Tagbody);
-  DEFINE_PACKAGE_SPECIAL_FORM(manager, special_forms, user, "GO", Go);
-  DEFINE_PACKAGE_SPECIAL_FORM(manager, special_forms, user, "QUOTE", Quote);
+  // FIXME: I think these also need to be moved out...
 
   // root bindings of values
 

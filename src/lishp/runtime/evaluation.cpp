@@ -1,17 +1,62 @@
 #include "evaluation.hpp"
+#include "functions/inherents.hpp"
 #include "package.hpp"
+
+static bool IsSpecialForm(environment::Environment *env,
+                          types::LishpSymbol *sym) {
+#define CHECK_SYM(name)                                                        \
+  do {                                                                         \
+    types::LishpSymbol *test_sym = env->package()->InternSymbol(name);         \
+    if (sym == test_sym) {                                                     \
+      return true;                                                             \
+    }                                                                          \
+  } while (0);
+
+  // TODO: umm this is incredibly stupid :)
+  CHECK_SYM("TAGBODY");
+  CHECK_SYM("GO");
+  CHECK_SYM("QUOTE");
+  return false;
+
+#undef CHECK_SYM
+}
+
+static auto HandleSpecialForm(environment::Environment *env,
+                              types::LishpSymbol *form_sym,
+                              types::LishpList &args) {
+#define HANDLE_FORM(form_name, FormHandler)                                    \
+  do {                                                                         \
+    types::LishpSymbol *handler_sym = env->package()->InternSymbol(form_name); \
+    if (form_sym == handler_sym) {                                             \
+      return inherents::special_forms::FormHandler(env, args);                 \
+    }                                                                          \
+  } while (0)
+
+  HANDLE_FORM("TAGBODY", Tagbody);
+  HANDLE_FORM("GO", Go);
+  HANDLE_FORM("QUOTE", Quote);
+
+  assert(0 && "Form passed is not a special form");
+
+#undef HANDLE_FORM
+}
 
 static auto EvalCons(environment::Environment *env, types::LishpCons *cons) {
   types::LishpForm car = cons->car;
   types::LishpSymbol *func_sym = car.AssertAs<types::LishpSymbol>();
-
-  types::LishpFunction *func = env->SymbolFunction(func_sym);
 
   types::LishpForm cdr = cons->cdr;
   types::LishpList args_list = types::LishpList::Nil();
   if (!cdr.NilP()) {
     args_list = types::LishpList::Of(cdr.AssertAs<types::LishpCons>());
   }
+
+  if (IsSpecialForm(env, func_sym)) {
+    return HandleSpecialForm(env, func_sym, args_list);
+  }
+
+  types::LishpFunction *func = env->SymbolFunction(func_sym);
+
   return func->Call(env, args_list);
 }
 
