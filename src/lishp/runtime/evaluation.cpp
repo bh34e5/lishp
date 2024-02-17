@@ -2,6 +2,13 @@
 #include "functions/inherents.hpp"
 #include "package.hpp"
 
+// forward decls
+
+static auto EvalCons(environment::Environment *lexical, types::LishpCons *cons)
+    -> types::LishpFunctionReturn;
+
+// impls
+
 static bool IsSpecialForm(environment::Environment *lexical,
                           types::LishpSymbol *sym) {
 #define CHECK_SYM(name)                                                        \
@@ -48,9 +55,31 @@ static auto HandleSpecialForm(environment::Environment *lexical,
 #undef HANDLE_FORM
 }
 
-static auto EvalCons(environment::Environment *lexical,
-                     types::LishpCons *cons) {
+static auto EvalLambdaForm(environment::Environment *lexical,
+                           types::LishpCons *lambda, types::LishpList &args)
+    -> types::LishpFunctionReturn {
+  // TODO: maybe this needs to change, not sure..
+  types::LishpFunctionReturn lambda_ret = BindLambdaForm(lexical, lambda);
+  assert(lambda_ret.values.size() == 1);
+
+  types::LishpFunction *func_form =
+      lambda_ret.values.at(0).AssertAs<types::LishpFunction>();
+
+  return func_form->Call(lexical, args);
+}
+
+static auto EvalCons(environment::Environment *lexical, types::LishpCons *cons)
+    -> types::LishpFunctionReturn {
   types::LishpForm car = cons->car;
+
+  if (car.ConsP()) {
+    types::LishpList cons_list = types::LishpList::Of(cons);
+    types::LishpList lambda_args = cons_list.rest();
+
+    return EvalLambdaForm(lexical, car.AssertAs<types::LishpCons>(),
+                          lambda_args);
+  }
+
   types::LishpSymbol *func_sym = car.AssertAs<types::LishpSymbol>();
 
   types::LishpForm cdr = cons->cdr;
@@ -92,6 +121,34 @@ static auto EvalObject(environment::Environment *lexical,
     return types::LishpFunctionReturn::FromValues(std::move(copy));
   }
   }
+}
+
+auto BindLambdaForm(environment::Environment *lexical,
+                    types::LishpCons *lambda_expr)
+    -> types::LishpFunctionReturn {
+  memory::MemoryManager *manager = lexical->package()->manager();
+
+  types::LishpList lambda_list = types::LishpList::Of(lambda_expr);
+
+  types::LishpForm lambda_sym_form = lambda_list.first();
+  assert(lambda_sym_form.AssertAs<types::LishpSymbol>()->lexeme == "LAMBDA");
+
+  types::LishpList rest = lambda_list.rest();
+
+  types::LishpForm args_form = rest.first();
+
+  types::LishpList args_list = types::LishpList::Nil();
+  if (!args_form.NilP()) {
+    types::LishpCons *args_cons = args_form.AssertAs<types::LishpCons>();
+    args_list = types::LishpList::Of(args_cons);
+  }
+  rest = rest.rest();
+
+  types::LishpFunction *bound_func =
+      manager->Allocate<types::LishpFunction>(lexical, args_list, rest);
+
+  return types::LishpFunctionReturn::FromValues(
+      types::LishpForm::FromObj(bound_func));
 }
 
 auto EvalForm(environment::Environment *lexical, types::LishpForm form)

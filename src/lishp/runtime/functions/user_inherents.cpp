@@ -28,9 +28,8 @@ auto Read(environment::Environment *closure, environment::Environment *lexical,
   return types::LishpFunctionReturn::FromValues(reader.ReadForm());
 }
 
-auto ReadChar(environment::Environment *closure,
-              environment::Environment *lexical, types::LishpList &args)
-    -> types::LishpFunctionReturn {
+auto ReadChar(environment::Environment *, environment::Environment *,
+              types::LishpList &args) -> types::LishpFunctionReturn {
   types::LishpForm stream_form = args.first();
   types::LishpIStream *stm_obj = stream_form.AssertAs<types::LishpIStream>();
 
@@ -39,9 +38,8 @@ auto ReadChar(environment::Environment *closure,
   return types::LishpFunctionReturn::FromValues(types::LishpForm::FromChar(x));
 }
 
-auto Format(environment::Environment *closure,
-            environment::Environment *lexical, types::LishpList &args)
-    -> types::LishpFunctionReturn {
+auto Format(environment::Environment *, environment::Environment *,
+            types::LishpList &args) -> types::LishpFunctionReturn {
   types::LishpForm o_stream = args.first();
   types::LishpList rest = args.rest();
 

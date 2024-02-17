@@ -4,6 +4,9 @@
 #include "environment.hpp"
 #include "types.hpp"
 
+auto BindLambdaForm(environment::Environment *lexical,
+                    types::LishpCons *lambda_expr)
+    -> types::LishpFunctionReturn;
 auto EvalForm(environment::Environment *lexical, types::LishpForm form)
     -> types::LishpFunctionReturn;
 auto EvalArgs(environment::Environment *lexical, types::LishpList &args)

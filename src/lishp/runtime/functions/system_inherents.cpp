@@ -10,7 +10,7 @@ namespace inherents {
 namespace system {
 
 auto Repl(environment::Environment *closure, environment::Environment *lexical,
-          types::LishpList &args) -> types::LishpFunctionReturn {
+          types::LishpList &) -> types::LishpFunctionReturn {
   // NOTE: I think, since this is a system function, redefinition is probably
   // either disabled, or it's undefined behavior, so I think I can just make a
   // call to the user read function?
@@ -179,8 +179,17 @@ static auto EscapeChar(char c) {
 }
 
 auto ReadDoubleQuote(environment::Environment *closure,
-                     environment::Environment *lexical, types::LishpList &args)
+                     environment::Environment *, types::LishpList &args)
     -> types::LishpFunctionReturn {
+  // FIXME: there is a possible bug... when I ran the interpreter with the
+  // following, I appear to have gotten stuck in a loop:
+  //
+  // ((lambda (a1) a1) "argstr)
+  // )
+  // ")
+  //
+  // We may not be handling newlines correctly? I'm not sure.
+
   // get the stream
   types::LishpForm stream_form = args.first();
   types::LishpIStream *stm_obj = stream_form.AssertAs<types::LishpIStream>();

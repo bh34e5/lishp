@@ -5,32 +5,6 @@
 
 namespace inherents {
 
-namespace impl {
-
-auto BindLambdaForm(environment::Environment *lexical,
-                    types::LishpCons *lambda_expr) {
-  memory::MemoryManager *manager = lexical->package()->manager();
-
-  types::LishpList lambda_list = types::LishpList::Of(lambda_expr);
-
-  types::LishpForm lambda_sym_form = lambda_list.first();
-  assert(lambda_sym_form.AssertAs<types::LishpSymbol>()->lexeme == "LAMBDA");
-
-  types::LishpList rest = lambda_list.rest();
-
-  types::LishpForm args_form = rest.first();
-  types::LishpCons *args_cons = args_form.AssertAs<types::LishpCons>();
-  rest = rest.rest();
-
-  types::LishpFunction *bound_func = manager->Allocate<types::LishpFunction>(
-      lexical, types::LishpList::Of(args_cons), rest);
-
-  return types::LishpFunctionReturn::FromValues(
-      types::LishpForm::FromObj(bound_func));
-}
-
-} // namespace impl
-
 namespace special_forms {
 
 // FIXME: I may need to change the way that I create these... maybe they
@@ -112,7 +86,7 @@ auto Function(environment::Environment *lexical, types::LishpList &args)
   }
 
   types::LishpCons *lambda_expr = first.AssertAs<types::LishpCons>();
-  return impl::BindLambdaForm(lexical, lambda_expr);
+  return BindLambdaForm(lexical, lambda_expr);
 }
 
 auto Progn(environment::Environment *lexical, types::LishpList &args)
