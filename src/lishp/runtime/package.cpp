@@ -17,7 +17,8 @@ auto Package::InternSymbol(std::string &&lexeme) -> types::LishpSymbol * {
   }
 
   // ran through and didn't find a match.. make a new symbol and insert it
-  types::LishpSymbol *sym = manager_->Allocate<types::LishpSymbol>(lexeme);
+  types::LishpSymbol *sym =
+      manager_->Allocate<types::LishpSymbol>(lexeme, this);
   interned_symbols_.insert({std::move(lexeme), sym});
 
   return sym;

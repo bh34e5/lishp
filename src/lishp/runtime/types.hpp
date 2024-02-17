@@ -16,6 +16,10 @@ namespace environment {
 class Environment;
 }
 
+namespace runtime {
+class Package;
+}
+
 namespace types {
 
 struct LishpObject {
@@ -200,10 +204,11 @@ struct LishpString : public LishpObject {
 };
 
 struct LishpSymbol : public LishpObject {
-  LishpSymbol(const std::string &lexeme)
-      : LishpObject(kSymbol), lexeme(lexeme) {}
+  LishpSymbol(const std::string &lexeme, runtime::Package *package)
+      : LishpObject(kSymbol), lexeme(lexeme), package(package) {}
 
   std::string lexeme;
+  runtime::Package *package;
 };
 
 struct LishpFunctionReturn {
