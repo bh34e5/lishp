@@ -31,6 +31,7 @@ DECLARE_FUNCTION(ReadChar);
 DECLARE_FUNCTION(Format);
 DECLARE_FUNCTION(Plus);
 DECLARE_FUNCTION(Star);
+DECLARE_FUNCTION(Funcall);
 
 } // namespace user
 

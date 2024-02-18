@@ -89,6 +89,7 @@ auto BuildUserPackage(LishpRuntime *runtime, memory::MemoryManager *manager)
   DEFINE_PACKAGE_FUNCTION(manager, user, user, global, "FORMAT", Format);
   DEFINE_PACKAGE_FUNCTION(manager, user, user, global, "+", Plus);
   DEFINE_PACKAGE_FUNCTION(manager, user, user, global, "*", Star);
+  DEFINE_PACKAGE_FUNCTION(manager, user, user, global, "FUNCALL", Funcall);
 
   // FIXME: I think these also need to be moved out...
 

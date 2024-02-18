@@ -106,6 +106,14 @@ auto Star(environment::Environment *, environment::Environment *,
       types::LishpForm::FromFixnum(prod));
 }
 
+auto Funcall(environment::Environment *, environment::Environment *lexical,
+             types::LishpList &args) -> types::LishpFunctionReturn {
+  types::LishpFunction *func = args.first().AssertAs<types::LishpFunction>();
+  types::LishpList funcall_args = args.rest();
+
+  return func->Call(lexical, funcall_args);
+}
+
 } // namespace user
 
 } // namespace inherents
