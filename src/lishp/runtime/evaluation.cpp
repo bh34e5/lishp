@@ -25,6 +25,7 @@ static bool IsSpecialForm(environment::Environment *lexical,
   CHECK_SYM("QUOTE");
   CHECK_SYM("FUNCTION");
   CHECK_SYM("PROGN");
+  CHECK_SYM("LABELS");
 
   return false;
 
@@ -49,6 +50,7 @@ static auto HandleSpecialForm(environment::Environment *lexical,
   HANDLE_FORM("QUOTE", Quote);
   HANDLE_FORM("FUNCTION", Function);
   HANDLE_FORM("PROGN", Progn);
+  HANDLE_FORM("LABELS", Labels);
 
   assert(0 && "Form passed is not a special form");
 

@@ -41,6 +41,7 @@ DECLARE_SPECIAL_FORM(Go);
 DECLARE_SPECIAL_FORM(Quote);
 DECLARE_SPECIAL_FORM(Function);
 DECLARE_SPECIAL_FORM(Progn);
+DECLARE_SPECIAL_FORM(Labels);
 
 } // namespace special_forms
 

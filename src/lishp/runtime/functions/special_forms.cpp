@@ -105,6 +105,64 @@ auto Progn(environment::Environment *lexical, types::LishpList &args)
   }
 }
 
+auto Labels(environment::Environment *lexical, types::LishpList &args)
+    -> types::LishpFunctionReturn {
+  // FIXME: I think doing this is a bad idea, because if I get a closure, and
+  // then I return out of here, that pointer is now garbage...
+  environment::Environment cur_env(lexical->package(), lexical);
+  memory::MemoryManager *manager = cur_env.package()->manager();
+
+  types::LishpForm func_bindings_form = args.first();
+  types::LishpList body = args.rest();
+
+  // NOTE: all the bindings are visible to all the functions, so we just need
+  // one lexical scope containing everything. For flet, since I don't think they
+  // see each other, that will probably need nested environments
+  if (!func_bindings_form.NilP()) {
+    types::LishpList bindings_list =
+        types::LishpList::Of(func_bindings_form.AssertAs<types::LishpCons>());
+
+    while (!bindings_list.nil) {
+      types::LishpForm func_binding = bindings_list.first();
+
+      if (func_binding.NilP()) {
+        bindings_list = bindings_list.rest();
+        continue;
+      }
+
+      types::LishpList func_binding_list =
+          types::LishpList::Of(func_binding.AssertAs<types::LishpCons>());
+
+      types::LishpForm func_name = func_binding_list.first();
+      types::LishpSymbol *func_name_sym =
+          func_name.AssertAs<types::LishpSymbol>();
+
+      func_binding_list = func_binding_list.rest();
+
+      types::LishpList func_args = types::LishpList::Nil();
+      types::LishpForm func_args_form = func_binding_list.first();
+      if (!func_args_form.NilP()) {
+        func_args =
+            types::LishpList::Of(func_args_form.AssertAs<types::LishpCons>());
+      }
+
+      func_binding_list = func_binding_list.rest();
+
+      types::LishpFunction *func = manager->Allocate<types::LishpFunction>(
+          &cur_env, func_args, func_binding_list);
+
+      cur_env.BindFunction(func_name_sym, func);
+
+      bindings_list = bindings_list.rest();
+    }
+  }
+
+  // build implicit progn for the body and evaluate it
+  types::LishpSymbol *progn_sym = cur_env.package()->InternSymbol("PROGN");
+  types::LishpList block = types::LishpList::Push(manager, progn_sym, body);
+  return EvalForm(&cur_env, block.to_form());
+}
+
 } // namespace special_forms
 
 } // namespace inherents
