@@ -29,6 +29,8 @@ namespace user {
 DECLARE_FUNCTION(Read);
 DECLARE_FUNCTION(ReadChar);
 DECLARE_FUNCTION(Format);
+DECLARE_FUNCTION(Plus);
+DECLARE_FUNCTION(Star);
 
 } // namespace user
 

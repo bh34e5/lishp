@@ -5,6 +5,23 @@
 
 namespace reader {
 
+namespace impl {
+
+static auto IsPotentialNumber(const std::string &token) {
+  // FIXME; this is a completely broken implementation that is just here for
+  // testing at the moment.
+
+  for (char c : token) {
+    if (!std::isdigit(c)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+} // namespace impl
+
 class Token {
 public:
   enum Type {
@@ -30,6 +47,11 @@ public:
       // experimentation
       return kSymbol;
     }
+
+    if (impl::IsPotentialNumber(buf_)) {
+      return kNumber;
+    }
+
     // FIXME: right now only reading symbols
     return kSymbol;
   }
@@ -263,6 +285,14 @@ step_10:
         package->InternSymbol(cur_token.GetBuffer());
 
     return types::LishpForm::FromObj(new_symbol);
+  }
+  case Token::kNumber: {
+    // TODO: double check, right now just assuming we have integers
+    std::string buf = cur_token.GetBuffer();
+
+    const char *start = buf.c_str();
+    char *end = nullptr;
+    return types::LishpForm::FromFixnum(std::strtoul(start, &end, 10));
   }
   default:
     assert(0 && "Unimplemented: reader::Reader::ReadForm");

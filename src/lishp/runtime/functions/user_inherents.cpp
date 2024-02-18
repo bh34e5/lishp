@@ -68,6 +68,44 @@ auto Format(environment::Environment *, environment::Environment *,
   return types::LishpFunctionReturn::FromValues(types::LishpForm::Nil());
 }
 
+auto Plus(environment::Environment *, environment::Environment *,
+          types::LishpList &args) -> types::LishpFunctionReturn {
+  uint32_t sum = 0;
+
+  types::LishpList rest = args;
+  while (!rest.nil) {
+    types::LishpForm first = rest.first();
+    assert(first.type == types::LishpForm::kFixnum);
+
+    uint32_t fixnum = first.fixnum;
+    sum += fixnum;
+
+    rest = rest.rest();
+  }
+
+  return types::LishpFunctionReturn::FromValues(
+      types::LishpForm::FromFixnum(sum));
+}
+
+auto Star(environment::Environment *, environment::Environment *,
+          types::LishpList &args) -> types::LishpFunctionReturn {
+  uint32_t prod = 1;
+
+  types::LishpList rest = args;
+  while (!rest.nil) {
+    types::LishpForm first = rest.first();
+    assert(first.type == types::LishpForm::kFixnum);
+
+    uint32_t fixnum = first.fixnum;
+    prod *= fixnum;
+
+    rest = rest.rest();
+  }
+
+  return types::LishpFunctionReturn::FromValues(
+      types::LishpForm::FromFixnum(prod));
+}
+
 } // namespace user
 
 } // namespace inherents

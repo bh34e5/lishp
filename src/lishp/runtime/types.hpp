@@ -61,6 +61,9 @@ struct LishpForm {
 
   static inline auto Nil() { return LishpForm{kNil, {.fixnum = 0}}; }
   static inline auto T() { return LishpForm{kT, {.fixnum = 0}}; }
+  static inline auto FromFixnum(uint32_t fixnum) {
+    return LishpForm{kFixnum, {.fixnum = fixnum}};
+  }
   static inline auto FromChar(char ch) { return LishpForm{kChar, {.ch = ch}}; }
   static inline auto FromObj(LishpObject *obj) {
     return LishpForm{kObject, {.object = obj}};
