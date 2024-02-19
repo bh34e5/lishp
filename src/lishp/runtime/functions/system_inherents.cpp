@@ -28,9 +28,7 @@ auto Repl(environment::Environment *closure, environment::Environment *lexical,
 
   types::LishpList nil_args = types::LishpList::Nil();
 
-  bool keep_running = true;
-
-  while (keep_running) {
+  while (true) {
     types::LishpFunctionReturn form_ret = user_read->Call(lexical, nil_args);
 
     // FIXME: need to check all my asserts...
@@ -55,9 +53,6 @@ auto Repl(environment::Environment *closure, environment::Environment *lexical,
 
     user_format->Call(lexical, format_args_list);
     std::cout << std::endl;
-
-    // FIXME: allow infinite looping
-    keep_running = false;
   }
 
   return {std::vector{types::LishpForm::Nil()}};
