@@ -14,7 +14,9 @@ namespace special_forms {
 
 auto Tagbody(environment::Environment *lexical, types::LishpList &args)
     -> types::LishpFunctionReturn {
-  environment::Environment cur_env(lexical->package(), lexical);
+  memory::MemoryManager *manager = lexical->package()->manager();
+  environment::Environment *cur_env =
+      manager->Allocate<environment::Environment>(lexical->package(), lexical);
 
   // mark all the tags (so that jumping forward works as well)
 
@@ -22,7 +24,7 @@ auto Tagbody(environment::Environment *lexical, types::LishpList &args)
   while (!rest.nil) {
     types::LishpForm form = rest.first();
     if (form.AtomP()) {
-      cur_env.MarkTag(form, rest);
+      cur_env->MarkTag(form, rest);
     }
     rest = rest.rest();
   }
@@ -34,7 +36,7 @@ auto Tagbody(environment::Environment *lexical, types::LishpList &args)
   while (!rest.nil) {
     types::LishpForm form = rest.first();
     if (form.ConsP()) {
-      types::LishpFunctionReturn ret = EvalForm(&cur_env, form);
+      types::LishpFunctionReturn ret = EvalForm(cur_env, form);
 
       if (ret.type == types::LishpFunctionReturn::kGo) {
         // check the current environment for the current tag, if found, set the
@@ -44,7 +46,7 @@ auto Tagbody(environment::Environment *lexical, types::LishpList &args)
 
         types::LishpForm target = ret.go_tag;
         types::LishpList next_list;
-        bool found = cur_env.FindTag(target, &next_list);
+        bool found = cur_env->FindTag(target, &next_list);
 
         if (found) {
           rest = next_list;
@@ -107,10 +109,9 @@ auto Progn(environment::Environment *lexical, types::LishpList &args)
 
 auto Labels(environment::Environment *lexical, types::LishpList &args)
     -> types::LishpFunctionReturn {
-  // FIXME: I think doing this is a bad idea, because if I get a closure, and
-  // then I return out of here, that pointer is now garbage...
-  environment::Environment cur_env(lexical->package(), lexical);
-  memory::MemoryManager *manager = cur_env.package()->manager();
+  memory::MemoryManager *manager = lexical->package()->manager();
+  environment::Environment *cur_env =
+      manager->Allocate<environment::Environment>(lexical->package(), lexical);
 
   types::LishpForm func_bindings_form = args.first();
   types::LishpList body = args.rest();
@@ -149,18 +150,18 @@ auto Labels(environment::Environment *lexical, types::LishpList &args)
       func_binding_list = func_binding_list.rest();
 
       types::LishpFunction *func = manager->Allocate<types::LishpFunction>(
-          &cur_env, func_args, func_binding_list);
+          cur_env, func_args, func_binding_list);
 
-      cur_env.BindFunction(func_name_sym, func);
+      cur_env->BindFunction(func_name_sym, func);
 
       bindings_list = bindings_list.rest();
     }
   }
 
   // build implicit progn for the body and evaluate it
-  types::LishpSymbol *progn_sym = cur_env.package()->InternSymbol("PROGN");
+  types::LishpSymbol *progn_sym = cur_env->package()->InternSymbol("PROGN");
   types::LishpList block = types::LishpList::Push(manager, progn_sym, body);
-  return EvalForm(&cur_env, block.to_form());
+  return EvalForm(cur_env, block.to_form());
 }
 
 } // namespace special_forms
