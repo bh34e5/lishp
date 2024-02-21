@@ -105,6 +105,14 @@ static auto StreamToString(LishpStream *stm) -> std::string {
   }
 }
 
+static auto SymbolToString(LishpSymbol *sym) -> std::string {
+  if (sym->unique) {
+    // TODO: actually figure out how these are printed
+    return "#" + sym->lexeme + ":" + std::to_string(sym->id);
+  }
+  return sym->lexeme;
+}
+
 static auto FunctionToString(LishpFunction *func) -> std::string {
   switch (func->function_type) {
   case LishpFunction::kInherent:
@@ -125,7 +133,7 @@ static auto ObjectToString(LishpObject *obj) -> std::string {
   case LishpObject::kString:
     return "\"" + obj->As<LishpString>()->lexeme + "\"";
   case LishpObject::kSymbol:
-    return obj->As<LishpSymbol>()->lexeme;
+    return SymbolToString(obj->As<LishpSymbol>());
   case LishpObject::kFunction:
     return FunctionToString(obj->As<LishpFunction>());
   case LishpObject::kReadtable:

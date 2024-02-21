@@ -52,6 +52,9 @@ public:
     return InternSymbol(std::move(copy));
   }
 
+  auto Gensym() -> types::LishpSymbol *;
+  auto Gensym(const std::string &lexeme) -> types::LishpSymbol *;
+
   inline auto BindValue(types::LishpSymbol *sym, types::LishpForm form) {
     global_->BindValue(sym, form);
   }
@@ -91,12 +94,17 @@ public:
       sym_pair.second->MarkUsed();
     }
 
+    for (types::LishpSymbol *sym : genned_syms_) {
+      sym->MarkUsed();
+    }
+
     global_->MarkUsed();
   }
 
 private:
   std::string name_;
   std::map<std::string, types::LishpSymbol *> interned_symbols_;
+  std::vector<types::LishpSymbol *> genned_syms_;
 
   LishpRuntime *runtime_;
   memory::MemoryManager *manager_;

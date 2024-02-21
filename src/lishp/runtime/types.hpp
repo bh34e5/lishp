@@ -215,12 +215,24 @@ struct LishpString : public LishpObject {
 
 struct LishpSymbol : public LishpObject {
   LishpSymbol(const std::string &lexeme, runtime::Package *package)
-      : LishpObject(kSymbol), lexeme(lexeme), package(package) {}
+      : LishpObject(kSymbol), lexeme(lexeme), unique(false), id(0),
+        package(package) {}
+  LishpSymbol(const std::string &lexeme, runtime::Package *package, bool unique)
+      : LishpObject(kSymbol), lexeme(lexeme), unique(unique), id(0),
+        package(package) {
+    if (unique) {
+      id = ++LishpSymbol::sym_id;
+    }
+  }
 
   auto MarkUsed() -> void;
 
   std::string lexeme;
+  bool unique;
+  uint32_t id;
   runtime::Package *package;
+
+  static inline uint32_t sym_id = 0;
 };
 
 struct LishpFunctionReturn {

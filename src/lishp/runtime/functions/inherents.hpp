@@ -32,6 +32,7 @@ DECLARE_FUNCTION(Format);
 DECLARE_FUNCTION(Plus);
 DECLARE_FUNCTION(Star);
 DECLARE_FUNCTION(Funcall);
+DECLARE_FUNCTION(Gensym);
 
 } // namespace user
 

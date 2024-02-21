@@ -24,6 +24,24 @@ auto Package::InternSymbol(std::string &&lexeme) -> types::LishpSymbol * {
   return sym;
 }
 
+auto Package::Gensym() -> types::LishpSymbol * {
+  // we are genning a symbol, so we always create a new one
+  types::LishpSymbol *sym =
+      manager_->Allocate<types::LishpSymbol>("", this, true);
+  genned_syms_.push_back(sym);
+
+  return sym;
+}
+
+auto Package::Gensym(const std::string &lexeme) -> types::LishpSymbol * {
+  // we are genning a symbol, so we always create a new one
+  types::LishpSymbol *sym =
+      manager_->Allocate<types::LishpSymbol>(lexeme, this, true);
+  genned_syms_.push_back(sym);
+
+  return sym;
+}
+
 auto Package::SymbolValue(types::LishpSymbol *sym) -> types::LishpForm {
   return global_->SymbolValue(sym);
 }
@@ -90,6 +108,7 @@ auto BuildUserPackage(LishpRuntime *runtime, memory::MemoryManager *manager)
   DEFINE_PACKAGE_FUNCTION(manager, user, user, global, "+", Plus);
   DEFINE_PACKAGE_FUNCTION(manager, user, user, global, "*", Star);
   DEFINE_PACKAGE_FUNCTION(manager, user, user, global, "FUNCALL", Funcall);
+  DEFINE_PACKAGE_FUNCTION(manager, user, user, global, "GENSYM", Gensym);
 
   // FIXME: I think these also need to be moved out...
 

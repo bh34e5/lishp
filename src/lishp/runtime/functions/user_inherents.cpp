@@ -114,6 +114,23 @@ auto Funcall(environment::Environment *, environment::Environment *lexical,
   return func->Call(lexical, funcall_args);
 }
 
+auto Gensym(environment::Environment *, environment::Environment *lexical,
+            types::LishpList &args) -> types::LishpFunctionReturn {
+  types::LishpSymbol *genned = nullptr;
+
+  if (args.nil) {
+    genned = lexical->package()->Gensym();
+  } else {
+    // TODO: check that this is the only way to call the function...
+    // I feel like that's probably an incorrect assumption
+    types::LishpForm first = args.first();
+    types::LishpString *str = first.AssertAs<types::LishpString>();
+    genned = lexical->package()->Gensym(str->lexeme);
+  }
+  return types::LishpFunctionReturn::FromValues(
+      types::LishpForm::FromObj(genned));
+}
+
 } // namespace user
 
 } // namespace inherents
