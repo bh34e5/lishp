@@ -148,4 +148,112 @@ auto LishpForm::ToString() -> std::string {
   }
 }
 
+auto LishpObject::MarkUsed() -> void {
+  switch (type) {
+  case kCons: {
+    this->As<LishpCons>()->MarkUsed();
+  } break;
+  case kString: {
+    this->As<LishpString>()->MarkUsed();
+  } break;
+  case kSymbol: {
+    this->As<LishpSymbol>()->MarkUsed();
+  } break;
+  case kFunction: {
+    this->As<LishpFunction>()->MarkUsed();
+  } break;
+  case kReadtable: {
+    this->As<LishpReadtable>()->MarkUsed();
+  } break;
+  case kStream: {
+    this->As<LishpStream>()->MarkUsed();
+  } break;
+  }
+}
+
+auto LishpCons::MarkUsed() -> void {
+  if (color != kWhite) {
+    // already marked
+    return;
+  }
+
+  color = kGrey;
+
+  if (car.type == LishpForm::kObject) {
+    car.object->MarkUsed();
+  }
+
+  if (cdr.type == LishpForm::kObject) {
+    cdr.object->MarkUsed();
+  }
+}
+
+auto LishpString::MarkUsed() -> void {
+  if (color != kWhite) {
+    // already marked
+    return;
+  }
+
+  color = kGrey;
+}
+
+auto LishpSymbol::MarkUsed() -> void {
+  if (color != kWhite) {
+    // already marked
+    return;
+  }
+
+  color = kGrey;
+}
+
+auto LishpFunction::MarkUsed() -> void {
+  if (color != kWhite) {
+    // already marked
+    return;
+  }
+
+  color = kGrey;
+
+  switch (function_type) {
+  case kInherent: {
+    closure->MarkUsed();
+  } break;
+  case kUserDefined: {
+    closure->MarkUsed();
+
+    if (!user_defined.args.nil) {
+      user_defined.args.cons->MarkUsed();
+    }
+
+    if (!user_defined.body.nil) {
+      user_defined.body.cons->MarkUsed();
+    }
+  } break;
+  case kSpecialForm:
+    return;
+  }
+}
+
+auto LishpReadtable::MarkUsed() -> void {
+  if (color != kWhite) {
+    // already marked
+    return;
+  }
+
+  color = kGrey;
+
+  for (auto &macro_func_pair : reader_macro_functions) {
+    macro_func_pair.second->MarkUsed();
+  }
+}
+
+auto LishpStream::MarkUsed() -> void {
+  if (color != kWhite) {
+    // already marked
+    return;
+  }
+
+  color = kGrey;
+}
+
 } // namespace types

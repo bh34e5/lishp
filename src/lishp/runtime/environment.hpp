@@ -12,12 +12,14 @@ class Package;
 
 namespace environment {
 
-class Environment {
+class Environment : public memory::MarkedObject {
 public:
   Environment() = delete;
-  Environment(runtime::Package *package) : package_(package) {}
+  Environment(runtime::Package *package)
+      : memory::MarkedObject(kEnvironment), package_(package) {}
   Environment(runtime::Package *package, Environment *parent)
-      : parent_(parent), package_(package) {}
+      : memory::MarkedObject(kEnvironment), parent_(parent), package_(package) {
+  }
   Environment(const Environment &other) = delete;
   Environment(Environment &&other) = delete;
   ~Environment() = default;
@@ -37,6 +39,50 @@ public:
   }
 
   inline auto package() { return package_; }
+
+  auto MarkUsed() -> void {
+    if (color != kWhite) {
+      // already marked
+      return;
+    }
+
+    color = kGrey;
+
+    for (auto &sym_val_pair : symbol_values_) {
+      sym_val_pair.first->MarkUsed();
+
+      types::LishpForm form = sym_val_pair.second;
+      if (form.type == types::LishpForm::kObject) {
+        form.object->MarkUsed();
+      }
+    }
+
+    for (auto &sym_func_pair : symbol_functions_) {
+      sym_func_pair.first->MarkUsed();
+
+      types::LishpFunction *func = sym_func_pair.second;
+      func->MarkUsed();
+    }
+
+    for (auto &sym_val_pair : tag_markers_) {
+      types::LishpForm form = sym_val_pair.first;
+      if (form.type == types::LishpForm::kObject) {
+        form.object->MarkUsed();
+      }
+
+      if (!sym_val_pair.second.nil) {
+        sym_val_pair.second.cons->MarkUsed();
+      }
+    }
+
+    for (types::LishpSymbol *sym : dynamic_symbols_) {
+      sym->MarkUsed();
+    }
+
+    if (parent_ != nullptr) {
+      parent_->MarkUsed();
+    }
+  }
 
 private:
   auto BindValue(types::LishpSymbol *sym, types::LishpForm value,

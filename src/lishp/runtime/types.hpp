@@ -7,6 +7,7 @@
 #include <map>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 #include "../memory/memory.hpp"
 
@@ -22,7 +23,7 @@ class Package;
 
 namespace types {
 
-struct LishpObject {
+struct LishpObject : public memory::MarkedObject {
   enum Types {
     kCons,
     kString,
@@ -32,15 +33,17 @@ struct LishpObject {
     kStream,
   };
 
-  LishpObject(Types type) : type(type) {}
+  LishpObject(Types type) : MarkedObject(kLishpObject), type(type) {}
 
   Types type;
 
   template <typename T,
             std::enable_if_t<std::is_base_of_v<LishpObject, T>, int> = 0>
   inline auto As() {
-    return (T *)this;
+    return static_cast<T *>(this);
   }
+
+  auto MarkUsed() -> void;
 };
 
 struct LishpForm {
@@ -103,6 +106,8 @@ struct LishpForm {
 struct LishpCons : public LishpObject {
   LishpCons(LishpForm car, LishpForm cdr)
       : LishpObject(kCons), car(car), cdr(cdr) {}
+
+  auto MarkUsed() -> void;
 
   LishpForm car;
   LishpForm cdr;
@@ -203,12 +208,16 @@ struct LishpString : public LishpObject {
   LishpString(std::string &&lexeme)
       : LishpObject(kString), lexeme(std::move(lexeme)) {}
 
+  auto MarkUsed() -> void;
+
   std::string lexeme;
 };
 
 struct LishpSymbol : public LishpObject {
   LishpSymbol(const std::string &lexeme, runtime::Package *package)
       : LishpObject(kSymbol), lexeme(lexeme), package(package) {}
+
+  auto MarkUsed() -> void;
 
   std::string lexeme;
   runtime::Package *package;
@@ -272,6 +281,8 @@ struct LishpFunction : public LishpObject {
       : LishpObject(kFunction), function_type(kSpecialForm), closure(nullptr),
         special_form(special_form) {}
 
+  auto MarkUsed() -> void;
+
   FuncTypes function_type;
   environment::Environment *closure;
   union {
@@ -297,6 +308,8 @@ struct LishpReadtable : public LishpObject {
 
   LishpReadtable(Case readcase) : LishpObject(kReadtable), readcase(readcase) {}
   LishpReadtable() : LishpObject(kReadtable), readcase(kUpcase) {}
+
+  auto MarkUsed() -> void;
 
   static inline auto CasedChar(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
@@ -365,6 +378,9 @@ struct LishpStream : public LishpObject {
 
   LishpStream(StreamType stream_type)
       : LishpObject(kStream), stream_type(stream_type) {}
+
+  auto MarkUsed() -> void;
+
   StreamType stream_type;
 };
 

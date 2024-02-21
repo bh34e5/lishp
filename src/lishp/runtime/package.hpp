@@ -12,16 +12,17 @@ namespace runtime {
 
 class LishpRuntime;
 
-class Package {
+class Package : public memory::MarkedObject {
 public:
   Package() = delete;
   Package(std::string &&name, LishpRuntime *runtime,
           memory::MemoryManager *manager)
-      : name_(std::move(name)), runtime_(runtime), manager_(manager) {
+      : memory::MarkedObject(kPackage), name_(std::move(name)),
+        runtime_(runtime), manager_(manager) {
     global_ = manager->Allocate<environment::Environment>(this);
   }
   Package(const Package &other) = delete;
-  Package(Package &&other) {
+  Package(Package &&other) : memory::MarkedObject(other.type) {
     std::swap(name_, other.name_);
     std::swap(interned_symbols_, other.interned_symbols_);
     runtime_ = other.runtime_;
@@ -76,6 +77,21 @@ public:
   inline auto SymbolFunction(std::string &&lexeme) {
     types::LishpSymbol *sym = InternSymbol(std::move(lexeme));
     return SymbolFunction(sym);
+  }
+
+  auto MarkUsed() -> void {
+    if (color != kWhite) {
+      // already marked
+      return;
+    }
+
+    color = kGrey;
+
+    for (auto &sym_pair : interned_symbols_) {
+      sym_pair.second->MarkUsed();
+    }
+
+    global_->MarkUsed();
   }
 
 private:

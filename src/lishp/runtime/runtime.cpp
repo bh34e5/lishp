@@ -30,7 +30,17 @@ auto LishpRuntime::Initialize() -> void {
 auto LishpRuntime::Uninitialize() -> void {
   // TODO: free necessary things
   manager_.Deallocate(default_readtable_);
+
+  using it_t = decltype(packages_)::iterator;
+  it_t pack_it = packages_.begin();
+  while (pack_it != packages_.end()) {
+    manager_.Deallocate(*pack_it);
+    pack_it = packages_.erase(pack_it);
+  }
+
   default_readtable_ = nullptr;
+
+  manager_.RunGC();
 }
 
 auto LishpRuntime::FindPackageByName(const std::string &name) -> Package * {
@@ -60,7 +70,17 @@ auto LishpRuntime::InitializePackage(Package *package) -> void {
   package->global_env()->BindValue(
       rt_sym, types::LishpForm::FromObj(default_readtable_));
 
-  packages_.push_back(std::move(package));
+  packages_.push_back(package);
+}
+
+auto LishpRuntime::MarkUsedObjects() -> void {
+  if (default_readtable_ != nullptr) {
+    default_readtable_->MarkUsed();
+  }
+
+  for (Package *package : packages_) {
+    package->MarkUsed();
+  }
 }
 
 } // namespace runtime

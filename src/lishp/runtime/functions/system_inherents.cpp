@@ -26,9 +26,19 @@ auto Repl(environment::Environment *closure, environment::Environment *lexical,
   types::LishpString *string_arg =
       manager->Allocate<types::LishpString>("~%~a");
 
+  // NOTE: this is getting bound in the environment so that the garbage
+  // collector doesn't try to clean it up.
+  types::LishpSymbol *format_str_sym =
+      closure->package()->InternSymbol("REPL-FORMAT-STR");
+  closure_pkg->BindValue(format_str_sym, types::LishpForm::FromObj(string_arg));
+
   types::LishpList nil_args = types::LishpList::Nil();
 
   while (true) {
+    // TO TEST: Running Garbage Collector after every iteration to see
+    // if anything breaks :)
+    runtime->CollectGarbage();
+
     types::LishpFunctionReturn form_ret = user_read->Call(lexical, nil_args);
 
     // FIXME: need to check all my asserts...
