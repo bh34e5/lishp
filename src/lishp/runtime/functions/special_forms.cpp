@@ -164,6 +164,51 @@ auto Labels(environment::Environment *lexical, types::LishpList &args)
   return EvalForm(cur_env, block.to_form());
 }
 
+auto LetStar(environment::Environment *lexical, types::LishpList &args)
+    -> types::LishpFunctionReturn {
+  // FIXME: This implementation is incorrect!!
+  memory::MemoryManager *manager = lexical->package()->manager();
+  environment::Environment *cur_env =
+      manager->Allocate<environment::Environment>(lexical->package(), lexical);
+
+  types::LishpForm var_bindings_form = args.first();
+  types::LishpList body = args.rest();
+
+  if (!var_bindings_form.NilP()) {
+    types::LishpList bindings_list =
+        types::LishpList::Of(var_bindings_form.AssertAs<types::LishpCons>());
+
+    while (!bindings_list.nil) {
+      types::LishpForm var_binding = bindings_list.first();
+
+      if (var_binding.NilP()) {
+        bindings_list = bindings_list.rest();
+        continue;
+      }
+
+      types::LishpList var_binding_list =
+          types::LishpList::Of(var_binding.AssertAs<types::LishpCons>());
+
+      types::LishpForm var_name = var_binding_list.first();
+      types::LishpSymbol *var_name_sym =
+          var_name.AssertAs<types::LishpSymbol>();
+
+      var_binding_list = var_binding_list.rest();
+
+      types::LishpForm var_binding_form = var_binding_list.first();
+
+      cur_env->BindValue(var_name_sym, var_binding_form);
+
+      bindings_list = bindings_list.rest();
+    }
+  }
+
+  // build implicit progn for the body and evaluate it
+  types::LishpSymbol *progn_sym = cur_env->package()->InternSymbol("PROGN");
+  types::LishpList block = types::LishpList::Push(manager, progn_sym, body);
+  return EvalForm(cur_env, block.to_form());
+}
+
 } // namespace special_forms
 
 } // namespace inherents

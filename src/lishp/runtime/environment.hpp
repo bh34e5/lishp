@@ -38,6 +38,7 @@ public:
     BindFunction(sym, func, true);
   }
 
+  inline auto parent() { return parent_; }
   inline auto package() { return package_; }
 
   auto MarkUsed() -> void {

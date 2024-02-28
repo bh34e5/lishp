@@ -4,6 +4,8 @@
 #include "environment.hpp"
 #include "types.hpp"
 
+auto IsSpecialForm(types::LishpSymbol *sym) -> bool;
+
 auto BindLambdaForm(environment::Environment *lexical,
                     types::LishpCons *lambda_expr)
     -> types::LishpFunctionReturn;

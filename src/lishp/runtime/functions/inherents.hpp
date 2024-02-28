@@ -44,6 +44,7 @@ DECLARE_SPECIAL_FORM(Quote);
 DECLARE_SPECIAL_FORM(Function);
 DECLARE_SPECIAL_FORM(Progn);
 DECLARE_SPECIAL_FORM(Labels);
+DECLARE_SPECIAL_FORM(LetStar);
 
 } // namespace special_forms
 

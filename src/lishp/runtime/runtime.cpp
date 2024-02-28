@@ -1,13 +1,14 @@
 #include "runtime.hpp"
+#include "interpreter/analyzer.hpp"
 
 namespace runtime {
 
-auto LishpRuntime::Repl() -> void {
+static auto OldRepl(LishpRuntime *rt) -> void {
   // run the internal function `system::repl`
   // FIXME: does this need to be upper case because of readcase?
   // FIXME: or maybe should this take a symbol instead of a string... probably
-  Package *system_package = FindPackageByName("SYSTEM");
-  Package *user_package = FindPackageByName("USER");
+  Package *system_package = rt->FindPackageByName("SYSTEM");
+  Package *user_package = rt->FindPackageByName("USER");
 
   types::LishpFunction *repl_function = system_package->SymbolFunction("REPL");
 
@@ -15,6 +16,33 @@ auto LishpRuntime::Repl() -> void {
   // NOTE: This is kinda scuffed... calling a system function in the context of
   // user package... not sure if this should work like this...
   repl_function->Call(user_package->global_env(), args_list);
+}
+
+auto LishpRuntime::Repl() -> void {
+  bool use_old_way = false;
+
+  // The old way, that was working...
+  if (use_old_way) {
+    OldRepl(this);
+    return;
+  }
+
+  Package *system_package = FindPackageByName("SYSTEM");
+  Package *user_package = FindPackageByName("USER");
+
+  types::LishpSymbol *repl_symbol = system_package->InternSymbol("REPL");
+
+  types::LishpForm car = types::LishpForm::FromObj(repl_symbol);
+  types::LishpForm cdr = types::LishpForm::Nil();
+
+  types::LishpCons cons(car, cdr);
+  types::LishpForm cons_form = types::LishpForm::FromObj(&cons);
+
+  bytecode::Analyzer analyzer;
+  std::vector<bytecode::Bytecode> bytecode = analyzer.TransformForm(cons_form);
+
+  bytecode::Evaluator evaluator(user_package->global_env());
+  evaluator.EvaluateBytecode(bytecode);
 }
 
 auto LishpRuntime::Initialize() -> void {

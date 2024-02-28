@@ -1,6 +1,7 @@
 #include <assert.h>
 
 #include "environment.hpp"
+#include "package.hpp"
 
 namespace environment {
 
@@ -18,6 +19,20 @@ auto Environment::SymbolValue(types::LishpSymbol *sym) -> types::LishpForm {
   // if parent is not null, check it
   if (parent_ != nullptr) {
     return parent_->SymbolValue(sym);
+  }
+
+  // If not bound in the current environment, check the "owner" package's
+  // global environment?
+
+  if (sym->package != package_) {
+    std::cout << "Checking another package for the value of "
+              << types::LishpForm::FromObj(sym).ToString() << std::endl;
+    // if the symbol is interned in another package, then check the global
+    // environment of that package...
+    if (sym->package != nullptr) {
+      return sym->package->SymbolValue(sym);
+    }
+    assert(0 && "Unhandled... symbol is not interned in any package");
   }
 
   // TODO: turn this into an exception
@@ -39,6 +54,20 @@ auto Environment::SymbolFunction(types::LishpSymbol *sym)
   // if parent is not null, check it
   if (parent_ != nullptr) {
     return parent_->SymbolFunction(sym);
+  }
+
+  // If not bound in the current environment, check the "owner" package's
+  // global environment?
+
+  if (sym->package != package_) {
+    std::cout << "Checking another package for the value of "
+              << types::LishpForm::FromObj(sym).ToString() << std::endl;
+    // if the symbol is interned in another package, then check the global
+    // environment of that package...
+    if (sym->package != nullptr) {
+      return sym->package->SymbolFunction(sym);
+    }
+    assert(0 && "Unhandled... symbol is not interned in any package");
   }
 
   // TODO: turn this into an exception

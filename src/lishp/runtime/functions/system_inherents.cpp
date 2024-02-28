@@ -35,6 +35,7 @@ auto Repl(environment::Environment *closure, environment::Environment *lexical,
   types::LishpList nil_args = types::LishpList::Nil();
 
   while (true) {
+    // FIXME:
     // TO TEST: Running Garbage Collector after every iteration to see
     // if anything breaks :)
     runtime->CollectGarbage();

@@ -9,29 +9,6 @@ static auto EvalCons(environment::Environment *lexical, types::LishpCons *cons)
 
 // impls
 
-static bool IsSpecialForm(environment::Environment *lexical,
-                          types::LishpSymbol *sym) {
-#define CHECK_SYM(name)                                                        \
-  do {                                                                         \
-    types::LishpSymbol *test_sym = lexical->package()->InternSymbol(name);     \
-    if (sym == test_sym) {                                                     \
-      return true;                                                             \
-    }                                                                          \
-  } while (0);
-
-  // TODO: umm this is incredibly stupid :)
-  CHECK_SYM("TAGBODY");
-  CHECK_SYM("GO");
-  CHECK_SYM("QUOTE");
-  CHECK_SYM("FUNCTION");
-  CHECK_SYM("PROGN");
-  CHECK_SYM("LABELS");
-
-  return false;
-
-#undef CHECK_SYM
-}
-
 static auto HandleSpecialForm(environment::Environment *lexical,
                               types::LishpSymbol *form_sym,
                               types::LishpList &args) {
@@ -51,6 +28,7 @@ static auto HandleSpecialForm(environment::Environment *lexical,
   HANDLE_FORM("FUNCTION", Function);
   HANDLE_FORM("PROGN", Progn);
   HANDLE_FORM("LABELS", Labels);
+  HANDLE_FORM("LET*", LetStar);
 
   assert(0 && "Form passed is not a special form");
 
@@ -90,7 +68,7 @@ static auto EvalCons(environment::Environment *lexical, types::LishpCons *cons)
     args_list = types::LishpList::Of(cdr.AssertAs<types::LishpCons>());
   }
 
-  if (IsSpecialForm(lexical, func_sym)) {
+  if (IsSpecialForm(func_sym)) {
     return HandleSpecialForm(lexical, func_sym, args_list);
   }
 
@@ -123,6 +101,29 @@ static auto EvalObject(environment::Environment *lexical,
     return types::LishpFunctionReturn::FromValues(std::move(copy));
   }
   }
+}
+
+auto IsSpecialForm(types::LishpSymbol *sym) -> bool {
+#define CHECK_SYM(name)                                                        \
+  do {                                                                         \
+    const std::string &sym_lex = sym->lexeme;                                  \
+    if (sym_lex == name) {                                                     \
+      return true;                                                             \
+    }                                                                          \
+  } while (0);
+
+  // TODO: umm this is incredibly stupid :)
+  CHECK_SYM("TAGBODY");
+  CHECK_SYM("GO");
+  CHECK_SYM("QUOTE");
+  CHECK_SYM("FUNCTION");
+  CHECK_SYM("PROGN");
+  CHECK_SYM("LABELS");
+  CHECK_SYM("LET*");
+
+  return false;
+
+#undef CHECK_SYM
 }
 
 auto BindLambdaForm(environment::Environment *lexical,
