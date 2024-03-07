@@ -26,6 +26,7 @@ typedef struct frame {
 } Frame;
 
 struct interpreter {
+  Runtime *rt;
   List form_stack;
   List frame_stack;
 };
@@ -227,13 +228,14 @@ static LishpFunctionReturn interpret_bytes(Interpreter *interpreter,
   return SINGLE_RETURN(result);
 }
 
-int initialize_interpreter(Interpreter **interpreter,
+int initialize_interpreter(Interpreter **interpreter, Runtime *rt,
                            Environment *initial_env) {
   *interpreter = allocate(sizeof(Interpreter));
   if (*interpreter == NULL) {
     return -1;
   }
 
+  (*interpreter)->rt = rt;
   list_init(&(*interpreter)->form_stack);
   list_init(&(*interpreter)->frame_stack);
 
@@ -268,7 +270,7 @@ LishpFunctionReturn interpret(Interpreter *interpreter, LishpForm form) {
 
 LishpFunctionReturn interpret_function_call(Interpreter *interpreter,
                                             LishpFunction *fn, LishpList args) {
-  Runtime *rt = get_runtime(interpreter);
+  Runtime *rt = interpreter->rt;
 
   List bytes;
   list_init(&bytes);
@@ -316,17 +318,7 @@ LishpFunctionReturn interpret_function_call(Interpreter *interpreter,
   return result;
 }
 
-Runtime *get_runtime(Interpreter *interpreter) {
-  // TODO: should I just make it a field in the interpreter? this handshake
-  // seems ridiculous
-
-  Frame top_frame;
-  list_get(&interpreter->frame_stack, sizeof(Frame),
-           interpreter->frame_stack.size - 1, &top_frame);
-
-  Environment *cur_env = top_frame.env;
-  return cur_env->rt;
-}
+Runtime *get_runtime(Interpreter *interpreter) { return interpreter->rt; }
 
 Environment *get_current_environment(Interpreter *interpreter) {
   Frame top_frame;

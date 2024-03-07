@@ -210,7 +210,7 @@ int initialize_runtime(Runtime *rt) {
 
   Package *user_package = find_package(rt, "USER");
   Environment *initial_env = user_package->global;
-  TEST_CALL(initialize_interpreter(&rt->interpreter, initial_env));
+  TEST_CALL(initialize_interpreter(&rt->interpreter, rt, initial_env));
 
   return 0;
 }
