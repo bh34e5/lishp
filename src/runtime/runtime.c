@@ -57,6 +57,12 @@ static int initialize_package(Package *p, Runtime *rt, const char *name) {
 
   p->current_readtable = rt->system_readtable;
 
+  LishpSymbol *nil_sym = intern_symbol(p, "NIL");
+  LishpSymbol *t_sym = intern_symbol(p, "T");
+
+  bind_value(p->global, nil_sym, NIL);
+  bind_value(p->global, t_sym, T);
+
   return 0;
 }
 
@@ -78,13 +84,17 @@ static int initialize_packages(Runtime *rt) {
     bind_function(package.global, name##_sym, name##_fn);                      \
   } while (0)
 
+  const char *system_name = "SYSTEM";
+  const char *common_lisp_name = "COMMON-LISP";
+  const char *user_name = "USER";
+
   Package system;
   Package common_lisp;
   Package user;
 
-  TEST_CALL(initialize_package(&system, rt, "SYSTEM"));
-  TEST_CALL(initialize_package(&common_lisp, rt, "COMMON-LISP"));
-  TEST_CALL(initialize_package(&user, rt, "USER"));
+  TEST_CALL(initialize_package(&system, rt, system_name));
+  TEST_CALL(initialize_package(&common_lisp, rt, common_lisp_name));
+  TEST_CALL(initialize_package(&user, rt, user_name));
 
   INSTALL_INHERENT(system_repl, system, "REPL");
   INSTALL_INHERENT(system_read_open_paren, system, "READ-OPEN-PAREN");
@@ -94,6 +104,10 @@ static int initialize_packages(Runtime *rt) {
 
   INSTALL_INHERENT(common_lisp_read, common_lisp, "READ");
   INSTALL_INHERENT(common_lisp_format, common_lisp, "FORMAT");
+
+  // TODO: use the package importing whenever I figure out how to do that...
+  INSTALL_INHERENT(common_lisp_read, user, "READ");
+  INSTALL_INHERENT(common_lisp_format, user, "FORMAT");
 
   TEST_CALL(list_push(&rt->packages, sizeof(Package), &system));
   TEST_CALL(list_push(&rt->packages, sizeof(Package), &common_lisp));

@@ -67,44 +67,74 @@ void bind_function(Environment *env, LishpSymbol *sym, LishpFunction *fn) {
   bind_function_rec(env, sym, fn, 1);
 }
 
-LishpForm symbol_value(Environment *env, LishpSymbol *sym) {
+static int symbol_value_int(Environment *env, LishpSymbol *sym,
+                            LishpForm *result) {
   if (strcmp(env->package, sym->package) != 0) {
     // TODO: look for the symbol exported in the package
     Package *p = find_package(env->rt, sym->package);
-    return symbol_value(p->global, sym);
+    *result = symbol_value(p->global, sym);
+    return 1;
   }
 
   LishpForm ret;
   if (map_get(&env->symbol_values, sizeof(LishpSymbol *), sizeof(LishpForm),
               &sym, &ret) == 0) {
-    return ret;
+    *result = ret;
+    return 1;
   }
 
   if (env->parent != NULL) {
-    return symbol_value(env->parent, sym);
+    *result = symbol_value(env->parent, sym);
+    return 1;
   }
 
-  assert(0 && "Symbol not bound in environment!");
-  return ret;
+  return 0;
 }
 
-LishpFunction *symbol_function(Environment *env, LishpSymbol *sym) {
+static int symbol_function_int(Environment *env, LishpSymbol *sym,
+                               LishpFunction **result) {
   if (strcmp(env->package, sym->package) != 0) {
     // TODO: look for the symbol exported in the package
     Package *p = find_package(env->rt, sym->package);
-    return symbol_function(p->global, sym);
+    *result = symbol_function(p->global, sym);
+    return 1;
   }
 
   LishpFunction *ret = NULL;
   if (map_get(&env->symbol_functions, sizeof(LishpSymbol *),
               sizeof(LishpFunction *), &sym, &ret) == 0) {
-    return ret;
+    *result = ret;
+    return 1;
   }
 
   if (env->parent != NULL) {
-    return symbol_function(env->parent, sym);
+    *result = symbol_function(env->parent, sym);
+    return 1;
   }
 
-  assert(0 && "Symbol not bound in environment!");
-  return ret;
+  return 0;
+}
+
+LishpForm symbol_value(Environment *env, LishpSymbol *sym) {
+  LishpForm result;
+
+  int found = symbol_value_int(env, sym, &result);
+
+  if (!found) {
+    assert(0 && "Symbol not bound in current environment!");
+  }
+
+  return result;
+}
+
+LishpFunction *symbol_function(Environment *env, LishpSymbol *sym) {
+  LishpFunction *result;
+
+  int found = symbol_function_int(env, sym, &result);
+
+  if (!found) {
+    assert(0 && "Symbol not bound in current environment!");
+  }
+
+  return result;
 }

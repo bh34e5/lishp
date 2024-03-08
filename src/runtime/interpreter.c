@@ -148,19 +148,21 @@ static int interpret_byte(void *arg_v, void *byte_v) {
 
     switch (fn->type) {
     case kInherent: {
-      interpret_function_call(interpreter, fn, args_list);
+      LishpFunctionReturn ret_val =
+          interpret_function_call(interpreter, fn, args_list);
+
+      assert(ret_val.return_count <= 1);
+      funcall_result = ret_val.first_return;
     } break;
     case kUserDefined: {
       assert(0 && "Unimplemented!");
     } break;
     }
 
-    assert(0 && "Unimplemented!");
-
     list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
     list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
 
-    list_pop(&interpreter->form_stack, sizeof(LishpForm), &funcall_result);
+    list_push(&interpreter->form_stack, sizeof(LishpForm), &funcall_result);
   } break;
   case kLookupSymbol: {
     LishpForm *form_ptr = NULL;

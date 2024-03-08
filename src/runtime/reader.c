@@ -349,6 +349,9 @@ step_10:
     // qualified symbols either... tbf, I'm not handling really anything
     // correctly yet :P
 
+    // zero-terminate so that the interning and copying and stuff goes correctly
+    add_character(readtable, &cur_token, '\0');
+
     Environment *cur_env = get_current_environment(reader->interpreter);
     Package *cur_package = find_package(rt, cur_env->package);
     LishpSymbol *new_symbol =
