@@ -8,7 +8,6 @@ typedef struct runtime Runtime;
 typedef struct interpreter Interpreter;
 
 typedef struct environment {
-  Runtime *rt;
   struct environment *parent;
   const char *package;
 
@@ -17,11 +16,12 @@ typedef struct environment {
 } Environment;
 
 typedef struct {
-  Runtime *rt;
   const char *name;
   Environment *global;
-  OrderedMap interned_symbols;
   LishpReadtable *current_readtable;
+
+  OrderedMap interned_symbols;
+  List exported_symbols;
 } Package;
 
 struct runtime {
@@ -42,7 +42,7 @@ LishpSymbol *intern_symbol(Package *p, const char *lexeme);
 
 void bind_value(Environment *env, LishpSymbol *sym, LishpForm val);
 void bind_function(Environment *env, LishpSymbol *sym, LishpFunction *fn);
-LishpForm symbol_value(Environment *env, LishpSymbol *sym);
-LishpFunction *symbol_function(Environment *env, LishpSymbol *sym);
+LishpForm symbol_value(Runtime *rt, Environment *env, LishpSymbol *sym);
+LishpFunction *symbol_function(Runtime *rt, Environment *env, LishpSymbol *sym);
 
 #endif

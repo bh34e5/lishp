@@ -17,8 +17,9 @@ LishpFunctionReturn system_repl(Interpreter *interpreter, LishpList args) {
   LishpSymbol *read_sym = intern_symbol(common_lisp, "READ");
   LishpSymbol *format_sym = intern_symbol(common_lisp, "FORMAT");
 
-  LishpFunction *read_fn = symbol_function(common_lisp->global, read_sym);
-  LishpFunction *format_fn = symbol_function(common_lisp->global, format_sym);
+  LishpFunction *read_fn = symbol_function(rt, common_lisp->global, read_sym);
+  LishpFunction *format_fn =
+      symbol_function(rt, common_lisp->global, format_sym);
 
   LishpString output_str = STRING("~a~%");
 
@@ -74,7 +75,7 @@ LishpFunctionReturn system_read_open_paren(Interpreter *interpreter,
 
   Package *common_lisp = find_package(rt, "COMMON-LISP");
   LishpSymbol *read_sym = intern_symbol(common_lisp, "READ");
-  LishpFunction *user_read = symbol_function(common_lisp->global, read_sym);
+  LishpFunction *user_read = symbol_function(rt, common_lisp->global, read_sym);
 
   assert(!args.nil && "Expected arguments!");
 
@@ -265,7 +266,7 @@ LishpFunctionReturn system_read_single_quote(Interpreter *interpreter,
   LishpSymbol *read_sym = intern_symbol(common_lisp, "READ");
   LishpSymbol *quote_sym = intern_symbol(common_lisp, "QUOTE");
 
-  LishpFunction *user_read = symbol_function(common_lisp->global, read_sym);
+  LishpFunction *user_read = symbol_function(rt, common_lisp->global, read_sym);
 
   assert(!args.nil && "Expected arguments!");
 

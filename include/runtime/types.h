@@ -187,10 +187,16 @@ typedef struct {
   FILE *file;
 } LishpStream;
 
-#include <stdio.h>
-static inline void print_form(LishpForm);
+void print_form(LishpForm);
 
-static inline void print_cons_rec(LishpCons *cons, int first) {
+#endif
+
+// I feel like this shouln't be outside of the guard...?
+#ifdef PRINT_TYPE_IMPL
+
+#include <stdio.h>
+
+void print_cons_rec(LishpCons *cons, int first) {
   if (!first) {
     printf(" ");
   }
@@ -211,13 +217,13 @@ static inline void print_cons_rec(LishpCons *cons, int first) {
   print_form(cons->cdr);
 }
 
-static inline void print_cons(LishpCons *cons) {
+void print_cons(LishpCons *cons) {
   printf("(");
   print_cons_rec(cons, 1);
   printf(")");
 }
 
-static inline void print_stream(LishpStream *stm) {
+void print_stream(LishpStream *stm) {
   switch (stm->type) {
   case kInput: {
     printf("<INPUT_STREAM>");
@@ -231,7 +237,7 @@ static inline void print_stream(LishpStream *stm) {
   }
 }
 
-static inline void print_symbol(LishpSymbol *sym) {
+void print_symbol(LishpSymbol *sym) {
   if (sym->id > 0) {
     // TODO: actually figure out how these are printed
     printf("#%s:%u", sym->lexeme, sym->id);
@@ -240,7 +246,7 @@ static inline void print_symbol(LishpSymbol *sym) {
   printf("%s", sym->lexeme);
 }
 
-static inline void print_function(LishpFunction *func) {
+void print_function(LishpFunction *func) {
   switch (func->type) {
   case kInherent: {
     printf("<INHERENT_FN>");
@@ -254,7 +260,7 @@ static inline void print_function(LishpFunction *func) {
   }
 }
 
-static inline void print_object(LishpObject *obj) {
+void print_object(LishpObject *obj) {
   switch (obj->type) {
   case kCons: {
     print_cons(AS(LishpCons, obj));
@@ -277,7 +283,7 @@ static inline void print_object(LishpObject *obj) {
   }
 }
 
-static inline void print_form(LishpForm f) {
+void print_form(LishpForm f) {
   switch (f.type) {
   case kT: {
     printf("T");

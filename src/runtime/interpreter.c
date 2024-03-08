@@ -113,6 +113,8 @@ static int interpret_byte(void *arg_v, void *byte_v) {
   Interpreter *interpreter = arg->interpreter;
   Bytecode *byte = byte_v;
 
+  Runtime *rt = interpreter->rt;
+
   switch (byte->op) {
   case kNop: {
     // NOP
@@ -180,7 +182,7 @@ static int interpret_byte(void *arg_v, void *byte_v) {
     list_ref(&interpreter->frame_stack, sizeof(Frame),
              interpreter->frame_stack.size - 1, (void **)&frame_ptr);
 
-    LishpForm form_val = symbol_value(frame_ptr->env, sym);
+    LishpForm form_val = symbol_value(rt, frame_ptr->env, sym);
 
     list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
     list_push(&interpreter->form_stack, sizeof(LishpForm), &form_val);
@@ -201,7 +203,7 @@ static int interpret_byte(void *arg_v, void *byte_v) {
     list_ref(&interpreter->frame_stack, sizeof(Frame),
              interpreter->frame_stack.size - 1, (void **)&frame_ptr);
 
-    LishpFunction *func_val = symbol_function(frame_ptr->env, sym);
+    LishpFunction *func_val = symbol_function(rt, frame_ptr->env, sym);
     LishpForm func_form = FROM_OBJ(func_val);
 
     list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
@@ -247,9 +249,9 @@ int initialize_interpreter(Interpreter **interpreter, Runtime *rt,
   return 0;
 }
 
-static int cleanup_interpreter(Interpreter *interpreter) {
-  list_clear(&interpreter->form_stack);
-  list_clear(&interpreter->frame_stack);
+int cleanup_interpreter(Interpreter **interpreter) {
+  list_clear(&(*interpreter)->form_stack);
+  list_clear(&(*interpreter)->frame_stack);
   return 0;
 }
 
