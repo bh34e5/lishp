@@ -39,17 +39,11 @@ typedef struct frame {
   struct frame *prev;
 } Frame;
 
-typedef struct {
-  int32_t push_count;
-} AnalyzeState;
-
 struct interpreter {
   Runtime *rt;
   List last_return_value;
   List form_stack;
   List frame_stack;
-
-  AnalyzeState analyze_state;
 
   OrderedMap function_environments; // LishpFunction * -> Environment *
   OrderedMap environment_bindings;  // Environment * -> LishpForm -> uint32_t
@@ -102,29 +96,25 @@ static int increment_indices_by(List *list, uint32_t inc) {
   return 0;
 }
 
-#define PUSH_BYTE_1(state, list, opcode)                                       \
+#define PUSH_BYTE_1(list, opcode)                                              \
   do {                                                                         \
     Bytecode byte = (Bytecode){.op = (opcode)};                                \
     list_push((list), sizeof(Bytecode), &byte);                                \
-    (state)->push_count += net_effects[opcode];                                \
   } while (0)
 
-#define PUSH_BYTE_2(state, list, opcode, f, t)                                 \
+#define PUSH_BYTE_2(list, opcode, f, t)                                        \
   do {                                                                         \
     Bytecode byte = (Bytecode){.op = (opcode), {.f = (t)}};                    \
     list_push((list), sizeof(Bytecode), &byte);                                \
-    (state)->push_count += net_effects[opcode];                                \
   } while (0)
-#define PUSH_BYTE_2_TARGET(state, list, opcode, t)                             \
-  PUSH_BYTE_2(state, list, opcode, target, t)
-#define PUSH_BYTE_2_INDEX(state, list, opcode, t)                              \
-  PUSH_BYTE_2(state, list, opcode, index, t)
+#define PUSH_BYTE_2_TARGET(list, opcode, t) PUSH_BYTE_2(list, opcode, target, t)
+#define PUSH_BYTE_2_INDEX(list, opcode, t) PUSH_BYTE_2(list, opcode, index, t)
 
-static int analyze_form(AnalyzeState *state, List *res, LishpForm form);
+static int analyze_form(List *res, LishpForm form);
 
-static int analyze_tagbody(AnalyzeState *state, List *res, LishpForm args) {
+static int analyze_tagbody(List *res, LishpForm args) {
   if (NIL_P(args)) {
-    PUSH_BYTE_2_TARGET(state, res, kOpPush, NIL);
+    PUSH_BYTE_2_TARGET(res, kOpPush, NIL);
     return 0;
   }
 
@@ -135,7 +125,7 @@ static int analyze_tagbody(AnalyzeState *state, List *res, LishpForm args) {
   list_init(&tag_bytes);
   list_init(&form_bytes);
 
-  PUSH_BYTE_1(state, res, kOpPushLexicalEnv);
+  PUSH_BYTE_1(res, kOpPushLexicalEnv);
 
   LishpCons *cons = AS_OBJECT(LishpCons, args);
   LishpForm cdr;
@@ -146,7 +136,7 @@ static int analyze_tagbody(AnalyzeState *state, List *res, LishpForm args) {
 
     if (IS_OBJECT_TYPE(car, kCons)) {
       // car is a cons, so analyze the form
-      TEST_CALL_LABEL(cleanup, analyze_form(state, &form_bytes, car));
+      TEST_CALL_LABEL(cleanup, analyze_form(&form_bytes, car));
     } else {
       // car is an atom, so tag it
 
@@ -155,8 +145,8 @@ static int analyze_tagbody(AnalyzeState *state, List *res, LishpForm args) {
       // instruction that was expecting nothing on the stack (I think)
 
       uint32_t instruction_ind = form_bytes.size;
-      PUSH_BYTE_2_TARGET(state, &tag_bytes, kOpPush, car);
-      PUSH_BYTE_2_INDEX(state, &tag_bytes, kOpBindTag, instruction_ind);
+      PUSH_BYTE_2_TARGET(&tag_bytes, kOpPush, car);
+      PUSH_BYTE_2_INDEX(&tag_bytes, kOpBindTag, instruction_ind);
     }
 
     if (!(NIL_P(cdr) || IS_OBJECT_TYPE(cdr, kCons))) {
@@ -173,9 +163,9 @@ static int analyze_tagbody(AnalyzeState *state, List *res, LishpForm args) {
   list_append(res, sizeof(Bytecode), &form_bytes);
 
   // return NIL in tagbody?
-  PUSH_BYTE_2_TARGET(state, res, kOpPush, NIL);
-  PUSH_BYTE_1(state, res, kOpRetForm);
-  PUSH_BYTE_1(state, res, kOpPopLexicalEnv);
+  PUSH_BYTE_2_TARGET(res, kOpPush, NIL);
+  PUSH_BYTE_1(res, kOpRetForm);
+  PUSH_BYTE_1(res, kOpPopLexicalEnv);
 
 cleanup:
   list_clear(&tag_bytes);
@@ -184,18 +174,17 @@ cleanup:
   return 0;
 }
 
-static int analyze_special_form(AnalyzeState *state, List *res, SpecialForm sf,
-                                LishpForm args) {
+static int analyze_special_form(List *res, SpecialForm sf, LishpForm args) {
   switch (sf) {
   case kSpGo: {
     assert(IS_OBJECT_TYPE(args, kCons) && "Expected cons in go");
     LishpForm car = AS_OBJECT(LishpCons, args)->car;
-    PUSH_BYTE_2_TARGET(state, res, kOpPush, car);
-    PUSH_BYTE_1(state, res, kOpGoReturn);
+    PUSH_BYTE_2_TARGET(res, kOpPush, car);
+    PUSH_BYTE_1(res, kOpGoReturn);
     return 0;
   } break;
   case kSpTagbody: {
-    return analyze_tagbody(state, res, args);
+    return analyze_tagbody(res, args);
   } break;
   default:
     assert(0 && "Unreachable");
@@ -204,7 +193,7 @@ static int analyze_special_form(AnalyzeState *state, List *res, SpecialForm sf,
   return -1;
 }
 
-static int analyze_cons(AnalyzeState *state, List *res, LishpCons *cons) {
+static int analyze_cons(List *res, LishpCons *cons) {
   LishpForm car = cons->car;
   if (car.type != kObject) {
     return -1;
@@ -221,58 +210,58 @@ static int analyze_cons(AnalyzeState *state, List *res, LishpCons *cons) {
     SpecialForm sf = is_special_form(sym);
 
     if (sf != kSpNone) {
-      return analyze_special_form(state, res, sf, cons->cdr);
+      return analyze_special_form(res, sf, cons->cdr);
     }
 
-    PUSH_BYTE_2_TARGET(state, res, kOpPush, car);
-    PUSH_BYTE_1(state, res, kOpLookupFunction);
-    PUSH_BYTE_2_TARGET(state, res, kOpPush, cons->cdr);
-    PUSH_BYTE_1(state, res, kOpFuncall);
+    PUSH_BYTE_2_TARGET(res, kOpPush, car);
+    PUSH_BYTE_1(res, kOpLookupFunction);
+    PUSH_BYTE_2_TARGET(res, kOpPush, cons->cdr);
+    PUSH_BYTE_1(res, kOpFuncall);
   } break;
   default: {
     return -1;
   } break;
   }
 
-  PUSH_BYTE_1(state, res, kOpRetForm);
+  PUSH_BYTE_1(res, kOpRetForm);
   return 0;
 }
 
-static int analyze_object(AnalyzeState *state, List *res, LishpObject *object) {
+static int analyze_object(List *res, LishpObject *object) {
   switch (object->type) {
   case kCons: {
-    return analyze_cons(state, res, AS(LishpCons, object));
+    return analyze_cons(res, AS(LishpCons, object));
   } break;
   case kSymbol: {
-    PUSH_BYTE_2_TARGET(state, res, kOpPush, FROM_OBJ(object));
-    PUSH_BYTE_1(state, res, kOpLookupSymbol);
+    PUSH_BYTE_2_TARGET(res, kOpPush, FROM_OBJ(object));
+    PUSH_BYTE_1(res, kOpLookupSymbol);
   } break;
   case kStream:
   case kString:
   case kFunction:
   case kReadtable: {
-    PUSH_BYTE_2_TARGET(state, res, kOpPush, FROM_OBJ(object));
+    PUSH_BYTE_2_TARGET(res, kOpPush, FROM_OBJ(object));
   }
   }
 
-  PUSH_BYTE_1(state, res, kOpRetForm);
+  PUSH_BYTE_1(res, kOpRetForm);
   return 0;
 }
 
-static int analyze_form(AnalyzeState *state, List *res, LishpForm form) {
+static int analyze_form(List *res, LishpForm form) {
   switch (form.type) {
   case kT:
   case kNil:
   case kChar:
   case kFixnum: {
-    PUSH_BYTE_2_TARGET(state, res, kOpPush, form);
+    PUSH_BYTE_2_TARGET(res, kOpPush, form);
   } break;
   case kObject: {
-    return analyze_object(state, res, form.object);
+    return analyze_object(res, form.object);
   } break;
   }
 
-  PUSH_BYTE_1(state, res, kOpRetForm);
+  PUSH_BYTE_1(res, kOpRetForm);
   return 0;
 }
 
@@ -456,9 +445,8 @@ static LishpFunctionReturn interpret_bytes(Interpreter *interpreter,
     if (foreach_res != 0) {
       if (foreach_res == 1) {
         // This was a go, so break out of the interpreting
-        LishpForm *target;
-        list_ref_last(&interpreter->form_stack, sizeof(LishpForm),
-                      (void **)&target);
+        LishpForm target;
+        list_pop(&interpreter->form_stack, sizeof(LishpForm), &target);
 
         Environment *cur_env = get_current_environment(interpreter);
 
@@ -469,10 +457,10 @@ static LishpFunctionReturn interpret_bytes(Interpreter *interpreter,
 
           uint32_t go_index;
           if (map_get(form_to_bytecode_offset, sizeof(LishpForm),
-                      sizeof(uint32_t), target, &go_index) < 0) {
+                      sizeof(uint32_t), &target, &go_index) < 0) {
             // form not found in the current environment bindings, so it's an
             // earlier one, thread back up the call stack
-            return GO_RETURN(*target);
+            return GO_RETURN(target);
           }
 
           // found the item, so set the correct index
@@ -481,7 +469,7 @@ static LishpFunctionReturn interpret_bytes(Interpreter *interpreter,
         } else {
           // there were no bindings for this environment, so it should be a
           // binding higher up
-          return GO_RETURN(*target);
+          return GO_RETURN(target);
         }
       } else {
         assert(0 && "Unhandled return code");
@@ -513,7 +501,6 @@ int initialize_interpreter(Interpreter **pinterpreter, Runtime *rt,
   *pinterpreter = interpreter;
 
   interpreter->rt = rt;
-  interpreter->analyze_state = (AnalyzeState){0};
 
   list_init(&interpreter->last_return_value);
   list_init(&interpreter->form_stack);
@@ -540,7 +527,7 @@ LishpFunctionReturn interpret(Interpreter *interpreter, LishpForm form) {
   List bytes;
   list_init(&bytes);
 
-  int analyze_res = analyze_form(&interpreter->analyze_state, &bytes, form);
+  int analyze_res = analyze_form(&bytes, form);
   if (analyze_res < 0) {
     assert(0 && "Error while analyzing form");
   }
@@ -569,7 +556,7 @@ LishpFunctionReturn interpret_function_call(Interpreter *interpreter,
     do {
       LishpForm car = cur_cons->car;
 
-      int analyze_res = analyze_form(&interpreter->analyze_state, &bytes, car);
+      int analyze_res = analyze_form(&bytes, car);
       if (analyze_res < 0) {
         assert(0 && "Error while analyzing form");
       }
@@ -640,7 +627,16 @@ static int push_environment(Interpreter *interpreter) {
 }
 
 static int pop_environment(Interpreter *interpreter) {
-  list_pop(&interpreter->last_return_value, sizeof(LishpForm), NULL);
+  LishpForm last_return;
+  list_pop(&interpreter->last_return_value, sizeof(LishpForm), &last_return);
   list_pop(&interpreter->frame_stack, sizeof(Frame), NULL);
+
+  // TODO: verify that every time I pop a lexical environment I want to be
+  // setting the previous last return to the return of the popped environment...
+  LishpForm *prev_last_return;
+  list_ref_last(&interpreter->last_return_value, sizeof(LishpForm),
+                (void **)&prev_last_return);
+
+  *prev_last_return = last_return;
   return 0;
 }
