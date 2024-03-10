@@ -23,7 +23,9 @@ int list_append(List *l, uint32_t size, List *other);
 int list_pop(List *l, uint32_t size, void *item);
 int list_remove(List *l, uint32_t size, uint32_t index, void *item);
 int list_get(List *l, uint32_t size, uint32_t index, void *item);
+int list_get_last(List *, uint32_t size, void *item);
 int list_ref(List *l, uint32_t size, uint32_t index, void **pitem);
+int list_ref_last(List *l, uint32_t size, void **pitem);
 int list_foreach(List *l, uint32_t size, Iterator it_fn, void *arg);
 int list_find(List *l, uint32_t size, Iterator it_fn, void *arg, void **pitem);
 

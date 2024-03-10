@@ -138,7 +138,7 @@ static int find_item(OrderedMap *m, uint32_t item_size, void *key,
     if (cmp == 0) {
       found_item = 1;
       break;
-    } else if (cmp > 0) {
+    } else if (cmp < 0) {
       break;
     }
 

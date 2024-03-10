@@ -60,7 +60,7 @@ int list_append(List *l, uint32_t size, List *other) {
   }
 
   void *target = l->items + (l->size * size);
-  memmove(target, other->items, (l->size * size));
+  memmove(target, other->items, (other->size * size));
 
   l->size += other->size;
   other->size = 0;
@@ -112,12 +112,26 @@ int list_get(List *l, uint32_t size, uint32_t index, void *item) {
   return 0;
 }
 
+int list_get_last(List *l, uint32_t size, void *item) {
+  void *target = l->items + ((l->size - 1) * size);
+  memmove(item, target, size);
+
+  return 0;
+}
+
 int list_ref(List *l, uint32_t size, uint32_t index, void **pitem) {
   if (index >= l->size) {
     return -1;
   }
 
   void *target = l->items + (index * size);
+  *pitem = target;
+
+  return 0;
+}
+
+int list_ref_last(List *l, uint32_t size, void **pitem) {
+  void *target = l->items + ((l->size - 1) * size);
   *pitem = target;
 
   return 0;

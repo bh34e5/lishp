@@ -38,7 +38,10 @@ Package *find_package(Runtime *rt, const char *name);
 #define ALLOCATE_OBJ(t, rt) ((t *)_allocate_obj(rt, sizeof(t)))
 void *_allocate_obj(Runtime *rt, uint32_t size);
 
+Environment *allocate_env(Runtime *rt, Environment *parent);
+
 LishpSymbol *intern_symbol(Package *p, const char *lexeme);
+LishpSymbol *gensym(Package *p, const char *lexeme);
 
 void bind_value(Environment *env, LishpSymbol *sym, LishpForm val);
 void bind_function(Environment *env, LishpSymbol *sym, LishpFunction *fn);

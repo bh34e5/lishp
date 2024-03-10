@@ -6,7 +6,6 @@
 #include "runtime.h"
 #include "runtime/functions.h"
 #include "runtime/interpreter.h"
-#define PRINT_TYPE_IMPL // maybe I'm doing this incorrectly
 #include "runtime/types.h"
 #include "util.h"
 
@@ -35,8 +34,10 @@ static int names_equal(void *arg, void *item) {
   return 0;
 }
 
-static int initialize_environment(Environment *env, Package *p) {
-  env->parent = NULL;
+static int initialize_environment(Environment *env, Environment *parent,
+                                  Package *p) {
+
+  env->parent = parent;
   env->package = p->name;
 
   map_init(&env->symbol_values, symbol_cmp);
@@ -52,9 +53,19 @@ static int cleanup_environment(Environment *env) {
   return 0;
 }
 
-static int name_cmp(void *l, void *r) {
+static int empty_name_cmp(void *l, void *r) {
   const char **l_strp = l;
   const char **r_strp = r;
+
+  if (*l_strp == NULL) {
+    if (*r_strp == NULL) {
+      return 0;
+    }
+    return -1;
+  }
+  if (*r_strp == NULL) {
+    return 1;
+  }
 
   int cmp = strcmp(*l_strp, *r_strp);
 
@@ -70,8 +81,8 @@ static int initialize_package(Package *p, Runtime *rt, const char *name) {
     return -1;
   }
 
-  TEST_CALL(initialize_environment(p->global, p));
-  TEST_CALL(map_init(&p->interned_symbols, name_cmp));
+  TEST_CALL(initialize_environment(p->global, NULL, p));
+  TEST_CALL(map_init(&p->interned_symbols, empty_name_cmp));
   TEST_CALL(list_init(&p->exported_symbols));
 
   LishpSymbol *nil_sym = intern_symbol(p, "NIL");
@@ -118,6 +129,46 @@ LishpSymbol *intern_symbol(Package *p, const char *lexeme) {
 
   map_insert(&p->interned_symbols, sizeof(const char *), sizeof(LishpSymbol *),
              &copied_lexeme, &sym);
+
+  return sym;
+}
+
+LishpSymbol *gensym(Package *p, const char *lexeme) {
+  LishpSymbol *sym = NULL;
+  int err = map_get(&p->interned_symbols, sizeof(const char *),
+                    sizeof(LishpSymbol *), &lexeme, &sym);
+
+  uint32_t next_id = 1;
+  if (err == 0) {
+    next_id = sym->id + 1;
+    // not returning, since we always want a unique symbol
+  }
+
+  // allocate a new symbol and insert it
+
+  sym = allocate(sizeof(LishpSymbol));
+  if (sym == NULL) {
+    return NULL;
+  }
+
+  char *new_str = NULL;
+  if (lexeme != NULL) {
+    uint32_t len = strlen(lexeme);
+    new_str = allocate(1 + len);
+
+    if (new_str == NULL) {
+      deallocate(sym, sizeof(LishpSymbol));
+      return NULL;
+    }
+
+    // to make sure the string lasts
+    new_str[len] = '\0';
+    strncpy(new_str, lexeme, len);
+  }
+  *sym = GENSYM(new_str, p->name, next_id);
+
+  map_insert(&p->interned_symbols, sizeof(const char *), sizeof(LishpSymbol *),
+             &new_str, &sym);
 
   return sym;
 }
@@ -268,4 +319,21 @@ static int cleanup_runtime(Runtime *rt) {
 void *_allocate_obj(Runtime *rt, uint32_t size) {
   (void)rt; // FIXME: should this do anything? Or is it not needed at all?
   return allocate(size);
+}
+
+Environment *allocate_env(Runtime *rt, Environment *parent) {
+  Package *p = find_package(rt, parent->package);
+
+  Environment *new_env = allocate(sizeof(Environment));
+  if (new_env == NULL) {
+    return NULL;
+  }
+  TEST_CALL_LABEL(failure, initialize_environment(new_env, parent, p));
+
+  return new_env;
+
+failure:
+  deallocate(new_env, sizeof(Environment));
+
+  return NULL;
 }

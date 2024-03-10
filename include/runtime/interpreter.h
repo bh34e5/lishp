@@ -4,7 +4,7 @@
 #include "runtime.h"
 #include "runtime/types.h"
 
-int initialize_interpreter(Interpreter **interpreter, Runtime *rt,
+int initialize_interpreter(Interpreter **pinterpreter, Runtime *rt,
                            Environment *initial_env);
 int cleanup_interpreter(Interpreter **interpreter);
 
