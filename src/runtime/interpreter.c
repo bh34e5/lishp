@@ -11,6 +11,7 @@ typedef enum {
   kOpPop,
   kOpRetForm,
   kOpBindTag,
+  kOpBindValue,
   kOpPushLexicalEnv,
   kOpPopLexicalEnv,
   kOpLookupSymbol,
@@ -66,12 +67,16 @@ static int get_top_frame_ref(Interpreter *interpreter, Frame **pframe) {
 typedef enum {
   kSpNone,
   kSpGo,
+  kSpLetStar,
+  kSpProgn,
   kSpTagbody,
 } SpecialForm;
 
 const char *special_forms[] = {
     // NOTE: make sure this is alphabetic
     [kSpGo] = "GO",
+    [kSpLetStar] = "LET*",
+    [kSpProgn] = "PROGN",
     [kSpTagbody] = "TAGBODY",
 };
 
@@ -114,15 +119,17 @@ static int increment_indices_by(List *list, uint32_t inc) {
     list_push((list), sizeof(Bytecode), &byte);                                \
   } while (0)
 
-#define PUSH_BYTE_2(list, opcode, f, t)                                        \
+#define _PUSH_BYTE_2(list, opcode, f, t)                                       \
   do {                                                                         \
     Bytecode byte = (Bytecode){.op = (opcode), {.f = (t)}};                    \
     list_push((list), sizeof(Bytecode), &byte);                                \
   } while (0)
-#define PUSH_BYTE_2_TARGET(list, opcode, t) PUSH_BYTE_2(list, opcode, target, t)
-#define PUSH_BYTE_2_INDEX(list, opcode, t) PUSH_BYTE_2(list, opcode, index, t)
+#define PUSH_BYTE_2_TARGET(list, opcode, t)                                    \
+  _PUSH_BYTE_2(list, opcode, target, t)
+#define PUSH_BYTE_2_INDEX(list, opcode, t) _PUSH_BYTE_2(list, opcode, index, t)
 
 static int analyze_form(List *res, LishpForm form);
+static int analyze_form_rec(List *res, LishpForm form, int with_ret);
 
 static int analyze_tagbody(List *res, LishpForm args) {
   if (NIL_P(args)) {
@@ -186,6 +193,82 @@ cleanup:
   return 0;
 }
 
+static int analyze_progn(List *res, LishpForm args) {
+  while (!NIL_P(args)) {
+    assert(IS_OBJECT_TYPE(args, kCons) && "Unexpected dotted pair in PROGN");
+
+    LishpCons *form_args = AS_OBJECT(LishpCons, args);
+    LishpForm form = form_args->car;
+    args = form_args->cdr;
+
+    TEST_CALL(analyze_form(res, form));
+  }
+  return 0;
+}
+
+static uint32_t analyze_let_star_bindings(List *res, LishpForm vars) {
+  uint32_t bindings_added = 0;
+
+  while (!NIL_P(vars)) {
+    assert(IS_OBJECT_TYPE(vars, kCons) &&
+           "Unexpected dotted pair in LET* bindings");
+
+    LishpCons *var_vars = AS_OBJECT(LishpCons, vars);
+    LishpForm var = var_vars->car;
+    vars = var_vars->cdr;
+
+    assert(IS_OBJECT_TYPE(var, kCons) &&
+           "Unexpected dotted pair in LET* bindings");
+
+    LishpCons *name_value = AS_OBJECT(LishpCons, var);
+
+    LishpForm name = name_value->car;
+    LishpForm value = name_value->cdr;
+
+    if (!NIL_P(value)) {
+      assert(IS_OBJECT_TYPE(value, kCons) &&
+             "Unexpected dotted pair in LET* bindings");
+
+      LishpCons *value_nil = AS_OBJECT(LishpCons, value);
+      value = value_nil->car;
+    }
+
+    PUSH_BYTE_1(res, kOpPushLexicalEnv);
+    PUSH_BYTE_2_TARGET(res, kOpPush, name);
+    analyze_form_rec(res, value, 0);
+    PUSH_BYTE_1(res, kOpBindValue);
+    PUSH_BYTE_1(res, kOpPop);
+
+    ++bindings_added;
+  }
+
+  return bindings_added;
+}
+
+static int analyze_let_star(List *res, LishpForm args) {
+  if (NIL_P(args)) {
+    // TODO: error message
+    assert(0 && "Apparently this is an error?");
+  }
+
+  assert(IS_OBJECT_TYPE(args, kCons) && "Cannot handle dotted pair in LET*");
+  LishpCons *vars_body = AS_OBJECT(LishpCons, args);
+
+  LishpForm vars = vars_body->car;
+  LishpForm body = vars_body->cdr;
+
+  uint32_t bindings_count = analyze_let_star_bindings(res, vars);
+
+  analyze_progn(res, body);
+
+  while (bindings_count > 0) {
+    PUSH_BYTE_1(res, kOpPopLexicalEnv);
+    --bindings_count;
+  }
+
+  return 0;
+}
+
 static int analyze_special_form(List *res, SpecialForm sf, LishpForm args) {
   switch (sf) {
   case kSpGo: {
@@ -194,17 +277,23 @@ static int analyze_special_form(List *res, SpecialForm sf, LishpForm args) {
     PUSH_BYTE_2_TARGET(res, kOpGoReturn, car);
     return 0;
   } break;
+  case kSpLetStar: {
+    return analyze_let_star(res, args);
+  } break;
+  case kSpProgn: {
+    return analyze_progn(res, args);
+  } break;
   case kSpTagbody: {
     return analyze_tagbody(res, args);
   } break;
-  default:
+  case kSpNone:
     assert(0 && "Unreachable");
   }
 
   return -1;
 }
 
-static int analyze_cons(List *res, LishpCons *cons) {
+static int analyze_cons(List *res, LishpCons *cons, int with_ret) {
   LishpForm car = cons->car;
   if (car.type != kObject) {
     return -1;
@@ -234,14 +323,16 @@ static int analyze_cons(List *res, LishpCons *cons) {
   } break;
   }
 
-  PUSH_BYTE_1(res, kOpRetForm);
+  if (with_ret) {
+    PUSH_BYTE_1(res, kOpRetForm);
+  }
   return 0;
 }
 
-static int analyze_object(List *res, LishpObject *object) {
+static int analyze_object(List *res, LishpObject *object, int with_ret) {
   switch (object->type) {
   case kCons: {
-    return analyze_cons(res, AS(LishpCons, object));
+    return analyze_cons(res, AS(LishpCons, object), with_ret);
   } break;
   case kSymbol: {
     PUSH_BYTE_2_TARGET(res, kOpPush, FROM_OBJ(object));
@@ -255,11 +346,13 @@ static int analyze_object(List *res, LishpObject *object) {
   }
   }
 
-  PUSH_BYTE_1(res, kOpRetForm);
+  if (with_ret) {
+    PUSH_BYTE_1(res, kOpRetForm);
+  }
   return 0;
 }
 
-static int analyze_form(List *res, LishpForm form) {
+static int analyze_form_rec(List *res, LishpForm form, int with_ret) {
   switch (form.type) {
   case kT:
   case kNil:
@@ -268,12 +361,18 @@ static int analyze_form(List *res, LishpForm form) {
     PUSH_BYTE_2_TARGET(res, kOpPush, form);
   } break;
   case kObject: {
-    return analyze_object(res, form.object);
+    return analyze_object(res, form.object, with_ret);
   } break;
   }
 
-  PUSH_BYTE_1(res, kOpRetForm);
+  if (with_ret) {
+    PUSH_BYTE_1(res, kOpRetForm);
+  }
   return 0;
+}
+
+static int analyze_form(List *res, LishpForm form) {
+  return analyze_form_rec(res, form, 1);
 }
 
 static int set_last_return(Interpreter *interpreter, LishpForm result) {
@@ -380,6 +479,30 @@ static int interpret_byte(Interpreter *interpreter, Bytecode *byte_v) {
     }
 
     list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
+  } break;
+  case kOpBindValue: {
+    LishpForm *pvalue_form;
+    LishpForm *pname_form;
+
+    uint32_t stack_size = interpreter->form_stack.size;
+    assert(stack_size > 1 && "Stack does not have the right size!");
+
+    list_ref(&interpreter->form_stack, sizeof(LishpForm), stack_size - 1,
+             (void **)&pvalue_form);
+    list_ref(&interpreter->form_stack, sizeof(LishpForm), stack_size - 2,
+             (void **)&pname_form);
+
+    assert(IS_OBJECT_TYPE(*pname_form, kSymbol) &&
+           "Cannot bind non-symbol value");
+
+    LishpSymbol *sym = AS_OBJECT(LishpSymbol, *pname_form);
+
+    Environment *cur_env = get_current_environment(interpreter);
+    bind_value(cur_env, sym, *pvalue_form);
+
+    list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
+    list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
+    list_push(&interpreter->form_stack, sizeof(LishpForm), pvalue_form);
   } break;
   case kOpPushLexicalEnv: {
     push_environment(interpreter, kSourceBytes);
