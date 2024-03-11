@@ -33,6 +33,7 @@ struct runtime {
 };
 
 int initialize_runtime(Runtime *rt);
+int cleanup_runtime(Runtime *rt);
 Package *find_package(Runtime *rt, const char *name);
 
 #define ALLOCATE_OBJ(t, rt) ((t *)_allocate_obj(rt, sizeof(t)))

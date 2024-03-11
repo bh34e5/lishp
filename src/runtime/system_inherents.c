@@ -52,7 +52,7 @@ LishpFunctionReturn system_repl(Interpreter *interpreter, LishpList args) {
         interpreter, format_fn, LIST_OF(&t_str_form_nil));
     CHECK_GO_RET(format_ret);
   }
-  // unreachable
+  // bye bye
 }
 
 static int is_whitespace(List *l, long pos) {

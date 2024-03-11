@@ -9,6 +9,8 @@ void repl() {
   initialize_runtime(&rt);
 
   rt.repl(&rt);
+
+  cleanup_runtime(&rt);
 }
 
 void compile_file(const char *filename) {

@@ -47,8 +47,8 @@ static int initialize_environment(Environment *env, Environment *parent,
 }
 
 static int cleanup_environment(Environment *env) {
-  map_clear(&env->symbol_values);
   map_clear(&env->symbol_functions);
+  map_clear(&env->symbol_values);
 
   return 0;
 }
@@ -97,6 +97,7 @@ static int initialize_package(Package *p, Runtime *rt, const char *name) {
 static int cleanup_package(Package *p) {
   list_clear(&p->exported_symbols);
   map_clear(&p->interned_symbols);
+  cleanup_environment(p->global);
   return 0;
 }
 
@@ -309,10 +310,24 @@ int initialize_runtime(Runtime *rt) {
   return 0;
 }
 
-static int cleanup_runtime(Runtime *rt) {
+static int cleanup_package_it(void *arg, void *obj) {
+  (void)arg;
+  return cleanup_package((Package *)obj);
+}
+
+int cleanup_runtime(Runtime *rt) {
   cleanup_interpreter(&rt->interpreter);
+
   // TODO: cleanup system readtable?
+
+  list_foreach(&rt->packages, sizeof(Package), cleanup_package_it, NULL);
   list_clear(&rt->packages);
+
+  uint32_t remaining_bytes = inspect_allocation();
+
+  fprintf(stdout, "[runtime]: Cleanup with %u bytes still allocated\n",
+          remaining_bytes);
+
   return 0;
 }
 
