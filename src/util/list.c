@@ -47,7 +47,7 @@ int list_append(List *l, uint32_t size, List *other) {
   if (l->size + other->size > l->cap) {
     uint32_t next_cap = l->cap;
     do {
-      next_cap = NEXT_CAPACITY(l->cap);
+      next_cap = NEXT_CAPACITY(next_cap);
     } while (l->size + other->size > next_cap);
 
     void *res = realloc(l->items, (size * next_cap));

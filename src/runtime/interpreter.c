@@ -34,8 +34,15 @@ typedef struct {
   };
 } Bytecode;
 
+typedef enum {
+  kSourceFuncall,
+  kSourceBytes,
+  kSourceBase,
+} FrameSource;
+
 typedef struct frame {
   Environment *env;
+  FrameSource source;
   struct frame *prev;
 } Frame;
 
@@ -48,6 +55,11 @@ struct interpreter {
   OrderedMap function_environments; // LishpFunction * -> Environment *
   OrderedMap environment_bindings;  // Environment * -> LishpForm -> uint32_t
 };
+
+static int get_top_frame_ref(Interpreter *interpreter, Frame **pframe) {
+  list_ref_last(&interpreter->frame_stack, sizeof(Frame), (void **)pframe);
+  return 0;
+}
 
 #define FORM_COUNT (sizeof(special_forms) / sizeof(special_forms[0]))
 
@@ -78,7 +90,7 @@ static SpecialForm is_special_form(LishpSymbol *sym) {
   return kSpNone;
 }
 
-static int push_environment(Interpreter *interpreter);
+static int push_environment(Interpreter *interpreter, FrameSource source);
 static int pop_environment(Interpreter *interpreter);
 
 static int incrementer(void *arg, void *obj) {
@@ -179,8 +191,7 @@ static int analyze_special_form(List *res, SpecialForm sf, LishpForm args) {
   case kSpGo: {
     assert(IS_OBJECT_TYPE(args, kCons) && "Expected cons in go");
     LishpForm car = AS_OBJECT(LishpCons, args)->car;
-    PUSH_BYTE_2_TARGET(res, kOpPush, car);
-    PUSH_BYTE_1(res, kOpGoReturn);
+    PUSH_BYTE_2_TARGET(res, kOpGoReturn, car);
     return 0;
   } break;
   case kSpTagbody: {
@@ -283,6 +294,37 @@ static int _form_cmp(void *l, void *r) {
   return form_cmp(*lptr, *rptr);
 }
 
+static int check_valid_tag(Interpreter *interpreter, LishpForm target) {
+  Frame *cur_frame;
+  get_top_frame_ref(interpreter, &cur_frame);
+
+  // NOTE: we are checking up the call stack, not the environment stack. that
+  // way you can't jump to a tag binding that no longer exists
+
+  do {
+    Environment *env = cur_frame->env;
+
+    OrderedMap *form_to_index;
+    int binding_ret =
+        map_ref(&interpreter->environment_bindings, sizeof(Environment *),
+                sizeof(OrderedMap), &env, (void **)&form_to_index);
+
+    if (binding_ret == 0) {
+      // there is a map of bindings for this environment...
+      int form_ret = map_ref(form_to_index, sizeof(LishpForm), sizeof(uint32_t),
+                             &target, NULL);
+      if (form_ret == 0) {
+        // we have the target in the bindings somewhere up the stream
+        return 1;
+      }
+    }
+
+    cur_frame = cur_frame->prev;
+  } while (cur_frame != NULL);
+
+  return 0;
+}
+
 static int interpret_byte(Interpreter *interpreter, Bytecode *byte_v) {
   Bytecode *byte = byte_v;
 
@@ -320,24 +362,27 @@ static int interpret_byte(Interpreter *interpreter, Bytecode *byte_v) {
                 sizeof(OrderedMap), &cur_env, (void **)&form_to_index);
 
     if (ref_res < 0) {
+      // this environment has no bindings, so create a new map...
       OrderedMap new_map;
       map_init(&new_map, _form_cmp);
+
+      // ... insert the binding...
+      map_insert(&new_map, sizeof(LishpForm), sizeof(uint32_t), ptag_form,
+                 &index);
+
+      // ... then put that new map in the environment bindings map
       map_insert(&interpreter->environment_bindings, sizeof(Environment *),
                  sizeof(OrderedMap), &cur_env, &new_map);
-
-      // This is a bit inefficient, but it's just checking pointer diffs, so
-      // it's probably not that bad.
-      map_ref(&interpreter->environment_bindings, sizeof(Environment *),
-              sizeof(OrderedMap), &cur_env, (void **)&form_to_index);
+    } else {
+      // we already had some bindings, so add them to the existing map
+      map_insert(form_to_index, sizeof(LishpForm), sizeof(uint32_t), ptag_form,
+                 &index);
     }
-
-    map_insert(form_to_index, sizeof(LishpForm), sizeof(uint32_t), ptag_form,
-               &index);
 
     list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
   } break;
   case kOpPushLexicalEnv: {
-    push_environment(interpreter);
+    push_environment(interpreter, kSourceBytes);
   } break;
   case kOpPopLexicalEnv: {
     pop_environment(interpreter);
@@ -427,10 +472,92 @@ static int interpret_byte(Interpreter *interpreter, Bytecode *byte_v) {
     list_push(&interpreter->form_stack, sizeof(LishpForm), &func_form);
   } break;
   case kOpGoReturn: {
+    int is_valid = check_valid_tag(interpreter, byte->target);
+    if (!is_valid) {
+      // TODO: when restarts and other stuff gets built, add it in here.
+      assert(0 && "Tag is unreachable!");
+    }
+    list_push(&interpreter->form_stack, sizeof(LishpForm), &byte->target);
     return 1;
   } break;
   }
   return 0;
+}
+
+typedef struct {
+  int return_result;
+  union {
+    LishpForm result;
+    uint32_t index;
+  };
+} GoResultHandleResponse;
+
+static void handle_go_result(Interpreter *interpreter,
+                             GoResultHandleResponse *response) {
+
+  LishpForm target;
+  list_pop(&interpreter->form_stack, sizeof(LishpForm), &target);
+
+  Frame *cur_frame;
+  get_top_frame_ref(interpreter, &cur_frame);
+
+  int decision_made = 0;
+  while (!decision_made && cur_frame != NULL) {
+    Environment *cur_env = cur_frame->env;
+
+    OrderedMap *form_to_bytecode_offset;
+    if (map_ref(&interpreter->environment_bindings, sizeof(Environment *),
+                sizeof(OrderedMap), &cur_env,
+                (void **)&form_to_bytecode_offset) < 0) {
+
+      // there were no bindings for this environment, so it should be a
+      // binding higher up, either return or continue up the environment chain
+
+      if (cur_frame->source != kSourceBytes) {
+        // current environment is not from the bytecode loop, so thread
+        // back up the call stack
+        response->result = target;
+        response->return_result = 1;
+        return;
+      } else {
+        // environment is from bytecode loop, so pop and environment and
+        // try again
+        pop_environment(interpreter);
+        cur_frame = cur_frame->prev;
+        continue;
+      }
+    }
+
+    // there were bindings, so check them now
+
+    uint32_t go_index;
+    if (map_get(form_to_bytecode_offset, sizeof(LishpForm), sizeof(uint32_t),
+                &target, &go_index) < 0) {
+
+      // form not found in the current environment bindings, so check in an
+      // earlier one
+
+      if (cur_frame->source != kSourceBytes) {
+        // current environment is not from the bytecode loop, so thread
+        // back up the call stack
+        response->result = target;
+        response->return_result = 1;
+        return;
+      } else {
+        // environment is from bytecode loop, so pop and environment and
+        // try again
+        pop_environment(interpreter);
+        cur_frame = cur_frame->prev;
+        continue;
+      }
+    }
+
+    // we found the binding, so set the index and return
+
+    response->index = go_index;
+    response->return_result = 0;
+    return;
+  }
 }
 
 static LishpFunctionReturn interpret_bytes(Interpreter *interpreter,
@@ -444,32 +571,17 @@ static LishpFunctionReturn interpret_bytes(Interpreter *interpreter,
 
     if (foreach_res != 0) {
       if (foreach_res == 1) {
-        // This was a go, so break out of the interpreting
-        LishpForm target;
-        list_pop(&interpreter->form_stack, sizeof(LishpForm), &target);
+        // This was a go
+        GoResultHandleResponse handle_response;
+        handle_go_result(interpreter, &handle_response);
 
-        Environment *cur_env = get_current_environment(interpreter);
-
-        OrderedMap *form_to_bytecode_offset;
-        if (map_ref(&interpreter->environment_bindings, sizeof(Environment *),
-                    sizeof(OrderedMap), &cur_env,
-                    (void **)&form_to_bytecode_offset) == 0) {
-
-          uint32_t go_index;
-          if (map_get(form_to_bytecode_offset, sizeof(LishpForm),
-                      sizeof(uint32_t), &target, &go_index) < 0) {
-            // form not found in the current environment bindings, so it's an
-            // earlier one, thread back up the call stack
-            return GO_RETURN(target);
-          }
-
-          // found the item, so set the correct index
-          index = go_index;
-          continue; // skip the increment at the bottom of the loop
+        if (handle_response.return_result) {
+          return GO_RETURN(handle_response.result);
         } else {
-          // there were no bindings for this environment, so it should be a
-          // binding higher up
-          return GO_RETURN(target);
+          // if we aren't returning the result, we should set the index and not
+          // increment at the bottom of this
+          index = handle_response.index;
+          continue;
         }
       } else {
         assert(0 && "Unhandled return code");
@@ -508,7 +620,8 @@ int initialize_interpreter(Interpreter **pinterpreter, Runtime *rt,
   map_init(&interpreter->function_environments, ptr_diff);
   map_init(&interpreter->environment_bindings, ptr_diff);
 
-  Frame first = (Frame){.env = initial_env, .prev = NULL};
+  Frame first =
+      (Frame){.env = initial_env, .source = kSourceBase, .prev = NULL};
   list_push(&interpreter->frame_stack, sizeof(Frame), &first);
 
   LishpForm nil = NIL;
@@ -543,6 +656,8 @@ LishpFunctionReturn interpret_function_call(Interpreter *interpreter,
                                             LishpFunction *fn, LishpList args) {
 
   Runtime *rt = interpreter->rt;
+
+  push_environment(interpreter, kSourceFuncall);
 
   List bytes;
   list_init(&bytes);
@@ -587,19 +702,12 @@ LishpFunctionReturn interpret_function_call(Interpreter *interpreter,
 
   LishpFunctionReturn result = fn->inherent_fn(interpreter, args_list);
 
+  pop_environment(interpreter);
+
   return result;
 }
 
 Runtime *get_runtime(Interpreter *interpreter) { return interpreter->rt; }
-
-static int get_top_frame_ref(Interpreter *interpreter, Frame **pframe) {
-  Frame *ptop_frame;
-  list_ref_last(&interpreter->frame_stack, sizeof(Frame), (void **)&ptop_frame);
-
-  *pframe = ptop_frame;
-
-  return 0;
-}
 
 Environment *get_current_environment(Interpreter *interpreter) {
   Frame *ptop_frame;
@@ -609,13 +717,14 @@ Environment *get_current_environment(Interpreter *interpreter) {
   return cur_env;
 }
 
-static int push_environment(Interpreter *interpreter) {
+static int push_environment(Interpreter *interpreter, FrameSource source) {
   Frame *ptop_frame;
   get_top_frame_ref(interpreter, &ptop_frame);
 
   Environment *new_env = allocate_env(interpreter->rt, ptop_frame->env);
   Frame new_frame = (Frame){
       .env = new_env,
+      .source = source,
       .prev = ptop_frame,
   };
 
