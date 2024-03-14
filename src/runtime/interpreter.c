@@ -729,7 +729,7 @@ static int ptr_diff(void *l, void *r) {
 int initialize_interpreter(Interpreter **pinterpreter, Runtime *rt,
                            Environment *initial_env) {
 
-  Interpreter *interpreter = allocate(sizeof(Interpreter));
+  Interpreter *interpreter = ALLOCATE_OBJ(Interpreter, rt);
   if (interpreter == NULL) {
     return -1;
   }

@@ -3,9 +3,19 @@
 
 #include <stdint.h>
 
-void *allocate(uint32_t size);
-void deallocate(void *ptr, uint32_t size);
+struct runtime;
+typedef void (*RuntimeMarker)(struct runtime *);
 
-uint32_t inspect_allocation();
+typedef struct manager MemoryManager;
+
+int initialize_manager(MemoryManager **pmanager, RuntimeMarker runtime_marker);
+int cleanup_manager(MemoryManager **pmanager);
+
+void *allocate(MemoryManager *manager, uint32_t size);
+void deallocate(MemoryManager *manager, void *ptr, uint32_t size);
+
+void mark_used(MemoryManager *manager, void *ptr);
+
+uint32_t inspect_allocation(MemoryManager *manager);
 
 #endif

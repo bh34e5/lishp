@@ -2,11 +2,11 @@
 #include <stdlib.h>
 
 #include "runtime/interpreter.h"
-#include "runtime/memory_manager.h"
 #include "runtime/reader.h"
 #include "util.h"
 
 struct reader {
+  Runtime *rt;
   Interpreter *interpreter;
   FILE *in;
 };
@@ -195,12 +195,14 @@ CharTraits get_char_traits(LishpReadtable *readtable, char c) {
   return type;
 }
 
-int initialize_reader(Reader **reader, Interpreter *interpreter, FILE *in) {
-  *reader = allocate(sizeof(Reader));
+int initialize_reader(Reader **reader, Runtime *rt, Interpreter *interpreter,
+                      FILE *in) {
+  *reader = ALLOCATE_OBJ(Reader, rt);
   if (*reader == NULL) {
     return -1;
   }
 
+  (*reader)->rt = rt;
   (*reader)->interpreter = interpreter;
   (*reader)->in = in;
 
@@ -208,12 +210,12 @@ int initialize_reader(Reader **reader, Interpreter *interpreter, FILE *in) {
 }
 
 int cleanup_reader(Reader **reader) {
-  deallocate(*reader, sizeof(Reader));
+  DEALLOCATE_OBJ(Reader, *reader, (*reader)->rt);
   return 0;
 }
 
 LishpForm read_form(Reader *reader) {
-  Runtime *rt = get_runtime(reader->interpreter);
+  Runtime *rt = reader->rt;
   // FIXME: get the value of *readtable* in the current dynamic environment
   LishpReadtable *readtable = rt->system_readtable;
 
@@ -360,7 +362,7 @@ step_10:
     Environment *cur_env = get_current_environment(reader->interpreter);
     Package *cur_package = find_package(rt, cur_env->package);
     LishpSymbol *new_symbol =
-        intern_symbol(cur_package, cur_token.characters.items);
+        intern_symbol(rt, cur_package, cur_token.characters.items);
 
     result = FROM_OBJ(new_symbol);
     goto cleanup;

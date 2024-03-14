@@ -7,6 +7,8 @@
 #include "runtime/types.h"
 
 LishpFunctionReturn common_lisp_read(Interpreter *interpreter, LishpList args) {
+  Runtime *rt = get_runtime(interpreter);
+
   FILE *in = stdin;
 
   if (!args.nil) {
@@ -22,7 +24,7 @@ LishpFunctionReturn common_lisp_read(Interpreter *interpreter, LishpList args) {
   }
 
   Reader *reader = NULL;
-  initialize_reader(&reader, interpreter, in);
+  initialize_reader(&reader, rt, interpreter, in);
 
   LishpForm form_in = read_form(reader);
   printf("\nJust got: ");

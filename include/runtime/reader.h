@@ -8,7 +8,8 @@
 
 typedef struct reader Reader;
 
-int initialize_reader(Reader **reader, Interpreter *interpreter, FILE *in);
+int initialize_reader(Reader **reader, Runtime *rt, Interpreter *interpreter,
+                      FILE *in);
 LishpForm read_form(Reader *reader);
 
 #endif

@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -74,7 +75,7 @@ static int empty_name_cmp(void *l, void *r) {
 
 static int initialize_package(Package *p, Runtime *rt, const char *name) {
   p->name = name;
-  p->global = allocate(sizeof(Environment));
+  p->global = ALLOCATE_OBJ(Environment, rt);
   p->current_readtable = rt->system_readtable;
 
   if (p->global == NULL) {
@@ -85,8 +86,8 @@ static int initialize_package(Package *p, Runtime *rt, const char *name) {
   TEST_CALL(map_init(&p->interned_symbols, empty_name_cmp));
   TEST_CALL(list_init(&p->exported_symbols));
 
-  LishpSymbol *nil_sym = intern_symbol(p, "NIL");
-  LishpSymbol *t_sym = intern_symbol(p, "T");
+  LishpSymbol *nil_sym = intern_symbol(rt, p, "NIL");
+  LishpSymbol *t_sym = intern_symbol(rt, p, "T");
 
   bind_value(p->global, nil_sym, NIL);
   bind_value(p->global, t_sym, T);
@@ -101,7 +102,7 @@ static int cleanup_package(Package *p) {
   return 0;
 }
 
-LishpSymbol *intern_symbol(Package *p, const char *lexeme) {
+LishpSymbol *intern_symbol(Runtime *rt, Package *p, const char *lexeme) {
   LishpSymbol *sym = NULL;
   int err = map_get(&p->interned_symbols, sizeof(const char *),
                     sizeof(LishpSymbol *), &lexeme, &sym);
@@ -113,13 +114,13 @@ LishpSymbol *intern_symbol(Package *p, const char *lexeme) {
   // not found, so allocate a new one and insert it
 
   uint32_t len = strlen(lexeme);
-  sym = allocate(sizeof(LishpSymbol));
-  char *copied_lexeme = allocate(1 + len);
+  sym = ALLOCATE_OBJ(LishpSymbol, rt);
+  char *copied_lexeme = allocate(rt->memory_manager, 1 + len);
   if (sym == NULL) {
     return NULL;
   }
   if (copied_lexeme == NULL) {
-    deallocate(sym, sizeof(LishpSymbol));
+    DEALLOCATE_OBJ(LishpSymbol, sym, rt);
     return NULL;
   }
   *sym = SYMBOL(copied_lexeme, p->name);
@@ -134,7 +135,7 @@ LishpSymbol *intern_symbol(Package *p, const char *lexeme) {
   return sym;
 }
 
-LishpSymbol *gensym(Package *p, const char *lexeme) {
+LishpSymbol *gensym(Runtime *rt, Package *p, const char *lexeme) {
   LishpSymbol *sym = NULL;
   int err = map_get(&p->interned_symbols, sizeof(const char *),
                     sizeof(LishpSymbol *), &lexeme, &sym);
@@ -147,7 +148,7 @@ LishpSymbol *gensym(Package *p, const char *lexeme) {
 
   // allocate a new symbol and insert it
 
-  sym = allocate(sizeof(LishpSymbol));
+  sym = ALLOCATE_OBJ(LishpSymbol, rt);
   if (sym == NULL) {
     return NULL;
   }
@@ -155,10 +156,10 @@ LishpSymbol *gensym(Package *p, const char *lexeme) {
   char *new_str = NULL;
   if (lexeme != NULL) {
     uint32_t len = strlen(lexeme);
-    new_str = allocate(1 + len);
+    new_str = allocate(rt->memory_manager, 1 + len);
 
     if (new_str == NULL) {
-      deallocate(sym, sizeof(LishpSymbol));
+      DEALLOCATE_OBJ(LishpSymbol, sym, rt);
       return NULL;
     }
 
@@ -195,13 +196,13 @@ static int import_package(Package *target, Package *source) {
 static int initialize_packages(Runtime *rt) {
 #define INSTALL_INHERENT(name, package, lexeme, export)                        \
   do {                                                                         \
-    LishpFunction *name##_fn = allocate(sizeof(LishpFunction));                \
+    LishpFunction *name##_fn = ALLOCATE_OBJ(LishpFunction, rt);                \
     if (name##_fn == NULL) {                                                   \
       return -1;                                                               \
     }                                                                          \
     *name##_fn = FUNCTION_INHERENT(name);                                      \
                                                                                \
-    LishpSymbol *name##_sym = intern_symbol(&package, lexeme);                 \
+    LishpSymbol *name##_sym = intern_symbol(rt, &package, lexeme);             \
     bind_function(package.global, name##_sym, name##_fn);                      \
                                                                                \
     if (export) {                                                              \
@@ -260,7 +261,7 @@ static int initialize_system_readtable(Runtime *rt, LishpReadtable *readtable) {
 #define INSTALL_READER_MACRO(ch, name)                                         \
   do {                                                                         \
     char c = ch;                                                               \
-    LishpSymbol *fn_sym = intern_symbol(system_package, name);                 \
+    LishpSymbol *fn_sym = intern_symbol(rt, system_package, name);             \
     LishpFunction *fn = symbol_function(rt, system_package->global, fn_sym);   \
     map_insert(&readtable->reader_macros, sizeof(char),                        \
                sizeof(LishpFunction *), &c, &fn);                              \
@@ -283,16 +284,21 @@ static int initialize_system_readtable(Runtime *rt, LishpReadtable *readtable) {
 static void repl(Runtime *rt) {
   Package *system_package = find_package(rt, "SYSTEM");
 
-  LishpSymbol *repl_sym = intern_symbol(system_package, "REPL");
+  LishpSymbol *repl_sym = intern_symbol(rt, system_package, "REPL");
   LishpFunction *repl_fn =
       symbol_function(rt, system_package->global, repl_sym);
 
   interpret_function_call(rt->interpreter, repl_fn, NIL_LIST);
 }
 
+static void mark_used_objs(Runtime *rt) { assert(0 && "Unimplemented!"); }
+
 int initialize_runtime(Runtime *rt) {
   rt->repl = repl;
-  rt->system_readtable = allocate(sizeof(LishpReadtable));
+
+  TEST_CALL(initialize_manager(&rt->memory_manager, mark_used_objs));
+
+  rt->system_readtable = ALLOCATE_OBJ(LishpReadtable, rt);
 
   if (rt->system_readtable == NULL) {
     return -1;
@@ -323,23 +329,28 @@ int cleanup_runtime(Runtime *rt) {
   list_foreach(&rt->packages, sizeof(Package), cleanup_package_it, NULL);
   list_clear(&rt->packages);
 
-  uint32_t remaining_bytes = inspect_allocation();
+  uint32_t remaining_bytes = inspect_allocation(rt->memory_manager);
 
   fprintf(stdout, "[runtime]: Cleanup with %u bytes still allocated\n",
           remaining_bytes);
+
+  cleanup_manager(&rt->memory_manager);
 
   return 0;
 }
 
 void *_allocate_obj(Runtime *rt, uint32_t size) {
-  (void)rt; // FIXME: should this do anything? Or is it not needed at all?
-  return allocate(size);
+  return allocate(rt->memory_manager, size);
+}
+
+void _deallocate_obj(Runtime *rt, void *ptr, uint32_t size) {
+  deallocate(rt->memory_manager, ptr, size);
 }
 
 Environment *allocate_env(Runtime *rt, Environment *parent) {
   Package *p = find_package(rt, parent->package);
 
-  Environment *new_env = allocate(sizeof(Environment));
+  Environment *new_env = ALLOCATE_OBJ(Environment, rt);
   if (new_env == NULL) {
     return NULL;
   }
@@ -348,7 +359,7 @@ Environment *allocate_env(Runtime *rt, Environment *parent) {
   return new_env;
 
 failure:
-  deallocate(new_env, sizeof(Environment));
+  DEALLOCATE_OBJ(Environment, new_env, rt);
 
   return NULL;
 }
