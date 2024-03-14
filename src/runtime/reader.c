@@ -1,8 +1,8 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "memory_manager.h"
 #include "runtime/interpreter.h"
+#include "runtime/memory_manager.h"
 #include "runtime/reader.h"
 #include "util.h"
 
@@ -204,6 +204,11 @@ int initialize_reader(Reader **reader, Interpreter *interpreter, FILE *in) {
   (*reader)->interpreter = interpreter;
   (*reader)->in = in;
 
+  return 0;
+}
+
+int cleanup_reader(Reader **reader) {
+  deallocate(*reader, sizeof(Reader));
   return 0;
 }
 

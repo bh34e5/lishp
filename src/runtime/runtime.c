@@ -2,10 +2,10 @@
 #include <string.h>
 
 #include "common.h"
-#include "memory_manager.h"
 #include "runtime.h"
 #include "runtime/functions.h"
 #include "runtime/interpreter.h"
+#include "runtime/memory_manager.h"
 #include "runtime/types.h"
 #include "util.h"
 

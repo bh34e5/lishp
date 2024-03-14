@@ -2,8 +2,8 @@
 #include <stdlib.h>
 
 #include "common.h"
-#include "memory_manager.h"
 #include "runtime/interpreter.h"
+#include "runtime/memory_manager.h"
 
 typedef enum {
   kOpNop,

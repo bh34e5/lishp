@@ -1,5 +1,5 @@
-#ifndef memory_
-#define memory_
+#ifndef runtime_memory_
+#define runtime_memory_
 
 #include <stdint.h>
 

@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#include "memory_manager.h"
+#include "runtime/memory_manager.h"
 
 #define MEGABYTES(n) ((n) << 20)
 #define BLOCK_SIZE MEGABYTES(4)
@@ -9,12 +9,23 @@ static char BLOCK[BLOCK_SIZE];
 static uint32_t index = 0;
 static uint32_t freed_bytes = 0;
 
+typedef enum {
+  kMarkWhite,
+  kMarkGrey,
+  kMarkBlack,
+} Marking;
+
+typedef struct {
+  uint32_t size;
+  Marking mark;
+} MarkingInfo;
+
 void *allocate(uint32_t size) {
-  if (index + size >= BLOCK_SIZE) {
+  if (index + size + sizeof(MarkingInfo) >= BLOCK_SIZE) {
     return NULL;
   }
 
-  void *ptr = BLOCK + index;
+  void *ptr = BLOCK + index + sizeof(MarkingInfo);
   index += size;
 
   return ptr;
