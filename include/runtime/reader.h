@@ -10,6 +10,7 @@ typedef struct reader Reader;
 
 int initialize_reader(Reader **reader, Runtime *rt, Interpreter *interpreter,
                       FILE *in);
+int cleanup_reader(Reader **reader);
 LishpForm read_form(Reader *reader);
 
 #endif

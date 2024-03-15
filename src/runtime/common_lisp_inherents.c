@@ -27,6 +27,9 @@ LishpFunctionReturn common_lisp_read(Interpreter *interpreter, LishpList args) {
   initialize_reader(&reader, rt, interpreter, in);
 
   LishpForm form_in = read_form(reader);
+
+  cleanup_reader(&reader);
+
   printf("\nJust got: ");
   print_form(form_in);
   printf("\n");
