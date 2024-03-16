@@ -14,7 +14,7 @@ typedef struct {
   void *items;
 } List;
 
-typedef int (*Iterator)(void *arg, void *obj);
+typedef int (*ListIterator)(void *arg, void *obj);
 
 int list_init(List *l);
 int list_clear(List *l);
@@ -27,10 +27,12 @@ int list_get(List *l, uint32_t size, uint32_t index, void *item);
 int list_get_last(List *, uint32_t size, void *item);
 int list_ref(List *l, uint32_t size, uint32_t index, void **pitem);
 int list_ref_last(List *l, uint32_t size, void **pitem);
-int list_foreach(List *l, uint32_t size, Iterator it_fn, void *arg);
-int list_find(List *l, uint32_t size, Iterator it_fn, void *arg, void **pitem);
+int list_foreach(List *l, uint32_t size, ListIterator it_fn, void *arg);
+int list_find(List *l, uint32_t size, ListIterator it_fn, void *arg,
+              void **pitem);
 
 typedef int (*Comparator)(void *l, void *r);
+typedef int (*MapIterator)(void *arg, void *key, void *val);
 
 typedef struct {
   Comparator cmp_fn;
@@ -49,5 +51,7 @@ int map_get(OrderedMap *m, uint32_t key_size, uint32_t val_size, void *key,
             void *value);
 int map_ref(OrderedMap *m, uint32_t key_size, uint32_t val_size, void *key,
             void **pvalue);
+int map_foreach(OrderedMap *m, uint32_t key_size, uint32_t val_size,
+                MapIterator it_fn, void *arg);
 
 #endif

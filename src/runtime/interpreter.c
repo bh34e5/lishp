@@ -775,6 +775,81 @@ int cleanup_interpreter(Interpreter **interpreter) {
   return 0;
 }
 
+static int form_mark_used_it(void *arg, void *obj) {
+  Runtime *rt = arg;
+  LishpForm *form = obj;
+
+  FORM_MARK_USED(rt, *form);
+
+  return 0;
+}
+
+static void list_of_forms_mark_used(Runtime *rt, List *list) {
+  list_foreach(list, sizeof(LishpForm), form_mark_used_it, rt);
+}
+
+static int frame_mark_used_it(void *arg, void *obj) {
+  Runtime *rt = arg;
+  Frame *frame = obj;
+
+  environment_mark_used(rt, frame->env);
+  if (frame->prev != NULL) {
+    // this actually maybe doesn't need to exist
+    frame_mark_used_it(arg, frame->prev);
+  }
+
+  return 0;
+}
+
+static int func_envs_mark_used_it(void *arg, void *key, void *val) {
+  Runtime *rt = arg;
+  LishpFunction **fn = key;
+  Environment **env = val;
+
+  OBJ_MARK_USED(rt, *fn);
+  environment_mark_used(rt, *env);
+
+  return 0;
+}
+
+static int binding_map_mark_used_it(void *arg, void *key, void *val) {
+  (void)val;
+
+  Runtime *rt = arg;
+  LishpForm *form = key;
+
+  FORM_MARK_USED(rt, *form);
+
+  return 0;
+}
+
+static int env_bindings_mark_used_it(void *arg, void *key, void *val) {
+  Runtime *rt = arg;
+  Environment **env = key;
+  OrderedMap *binding_map = val;
+
+  environment_mark_used(rt, *env);
+  map_foreach(binding_map, sizeof(LishpForm), sizeof(uint32_t),
+              binding_map_mark_used_it, arg);
+
+  return 0;
+}
+
+void interpreter_mark_used_objs(Interpreter *interpreter) {
+  Runtime *rt = interpreter->rt;
+
+  list_of_forms_mark_used(rt, &interpreter->form_stack);
+  list_of_forms_mark_used(rt, &interpreter->last_return_value);
+  list_foreach(&interpreter->frame_stack, sizeof(Frame), frame_mark_used_it,
+               rt);
+
+  map_foreach(&interpreter->function_environments, sizeof(LishpFunction *),
+              sizeof(Environment *), func_envs_mark_used_it, rt);
+
+  map_foreach(&interpreter->environment_bindings, sizeof(Environment *),
+              sizeof(OrderedMap), env_bindings_mark_used_it, rt);
+}
+
 LishpFunctionReturn interpret(Interpreter *interpreter, LishpForm form) {
   List bytes;
   list_init(&bytes);

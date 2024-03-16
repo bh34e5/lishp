@@ -149,7 +149,7 @@ int list_ref_last(List *l, uint32_t size, void **pitem) {
   return 0;
 }
 
-int list_foreach(List *l, uint32_t size, Iterator it_fn, void *arg) {
+int list_foreach(List *l, uint32_t size, ListIterator it_fn, void *arg) {
   uint32_t ind = 0;
   while (ind < l->size) {
     void *item = l->items + (ind * size);
@@ -164,7 +164,8 @@ int list_foreach(List *l, uint32_t size, Iterator it_fn, void *arg) {
   return 0;
 }
 
-int list_find(List *l, uint32_t size, Iterator it_fn, void *arg, void **pitem) {
+int list_find(List *l, uint32_t size, ListIterator it_fn, void *arg,
+              void **pitem) {
   uint32_t ind = 0;
   while (ind < l->size) {
     void *item = l->items + (ind * size);

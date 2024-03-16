@@ -21,4 +21,6 @@ int pop_form_return(Interpreter *interpreter, LishpForm *result);
 Runtime *get_runtime(Interpreter *interpreter);
 Environment *get_current_environment(Interpreter *interpreter);
 
+void interpreter_mark_used_objs(Interpreter *interpreter);
+
 #endif

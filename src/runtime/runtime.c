@@ -293,12 +293,95 @@ static void repl(Runtime *rt) {
   interpret_function_call(rt->interpreter, 0);
 }
 
-static void mark_used_objs(Runtime *rt) { assert(0 && "Unimplemented!"); }
+void _obj_mark_used(Runtime *rt, LishpObject *obj) {
+  mark_used(rt->memory_manager, obj);
+}
+
+static int sym_val_mark_used_it(void *arg, void *key, void *val) {
+  Runtime *rt = arg;
+  LishpSymbol **sym = key;
+  LishpForm *form = val;
+
+  OBJ_MARK_USED(rt, *sym);
+  FORM_MARK_USED(rt, *form);
+
+  return 0;
+}
+
+static int sym_func_mark_used_it(void *arg, void *key, void *val) {
+  Runtime *rt = arg;
+  LishpSymbol **sym = key;
+  LishpFunction **fn = val;
+
+  OBJ_MARK_USED(rt, *sym);
+  OBJ_MARK_USED(rt, *fn);
+
+  return 0;
+}
+
+int environment_mark_used(Runtime *rt, Environment *env) {
+  (void)rt;
+
+  if (env->parent != NULL) {
+    environment_mark_used(rt, env->parent);
+  }
+
+  map_foreach(&env->symbol_values, sizeof(LishpSymbol *), sizeof(LishpForm),
+              sym_val_mark_used_it, rt);
+  map_foreach(&env->symbol_functions, sizeof(LishpSymbol *),
+              sizeof(LishpFunction *), sym_func_mark_used_it, rt);
+
+  return 0;
+}
+
+static int interned_syms_mark_used_it(void *arg, void *key, void *val) {
+  (void)key;
+
+  Runtime *rt = arg;
+  LishpSymbol **sym = val;
+
+  OBJ_MARK_USED(rt, *sym);
+
+  return 0;
+}
+
+static int exported_syms_mark_used_it(void *arg, void *obj) {
+  Runtime *rt = arg;
+  LishpSymbol **sym = obj;
+
+  OBJ_MARK_USED(rt, *sym);
+
+  return 0;
+}
+
+static int package_mark_used_it(void *arg, void *obj) {
+  Runtime *rt = arg;
+  Package *p = obj;
+
+  environment_mark_used(rt, p->global);
+  OBJ_MARK_USED(rt, p->current_readtable);
+  map_foreach(&p->interned_symbols, sizeof(const char *), sizeof(LishpSymbol *),
+              interned_syms_mark_used_it, rt);
+  list_foreach(&p->exported_symbols, sizeof(LishpSymbol *),
+               exported_syms_mark_used_it, rt);
+
+  return 0;
+}
+
+static void objs_mark_used(Runtime *rt) {
+  mark_used(rt->memory_manager, rt->system_readtable);
+
+  interpreter_mark_used_objs(rt->interpreter);
+  list_foreach(&rt->packages, sizeof(Package), package_mark_used_it, rt);
+
+  assert(0 && "Unimplemented!");
+  return;
+}
 
 int initialize_runtime(Runtime *rt) {
   rt->repl = repl;
 
-  TEST_CALL(initialize_manager(&rt->memory_manager, mark_used_objs));
+  TEST_CALL(initialize_manager(&rt->memory_manager, objs_mark_used));
 
   rt->system_readtable = ALLOCATE_OBJ(LishpReadtable, rt);
 

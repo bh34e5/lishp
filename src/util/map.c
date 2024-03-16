@@ -126,6 +126,21 @@ int map_ref(OrderedMap *m, uint32_t key_size, uint32_t val_size, void *key,
   return 0;
 }
 
+int map_foreach(OrderedMap *m, uint32_t key_size, uint32_t val_size,
+                MapIterator it_fn, void *arg) {
+
+  for (uint32_t ind = 0; ind < m->size; ++ind) {
+    void *key_target = m->items + (ind * (key_size + val_size));
+    void *val_target = key_target + key_size;
+
+    int it_res = it_fn(arg, key_target, val_target);
+    if (it_res != 0) {
+      return it_res;
+    }
+  }
+  return 0;
+}
+
 static int find_item(OrderedMap *m, uint32_t item_size, void *key,
                      uint32_t *ind) {
 
