@@ -243,12 +243,15 @@ step_1:
     goto step_1;
   case kCharTerminatingMacroCharacter:
   case kCharNonTerminatingMacroCharacter: {
-    LishpStream stream_obj = STREAM(kInput, reader->in);
+    LishpStream *stream_obj = ALLOCATE_OBJ(LishpStream, rt);
+    LishpCons *c_nil = ALLOCATE_OBJ(LishpCons, rt);
+    LishpCons *stream_c_nil = ALLOCATE_OBJ(LishpCons, rt);
 
-    LishpCons c_nil = CONS(FROM_CHAR(x), NIL);
-    LishpCons stream_c_nil = CONS(FROM_OBJ(&stream_obj), FROM_OBJ(&c_nil));
+    *stream_obj = STREAM(kInput, reader->in);
+    *c_nil = CONS(FROM_CHAR(x), NIL);
+    *stream_c_nil = CONS(FROM_OBJ(stream_obj), FROM_OBJ(c_nil));
 
-    LishpList args = LIST_OF(&stream_c_nil);
+    LishpList args = LIST_OF(stream_c_nil);
 
     LishpFunction *macro_fn = NULL;
     map_get(&readtable->reader_macros, sizeof(char), sizeof(LishpFunction *),
