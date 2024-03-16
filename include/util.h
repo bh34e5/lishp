@@ -21,6 +21,7 @@ int list_clear(List *l);
 int list_push(List *l, uint32_t size, void *item);
 int list_append(List *l, uint32_t size, List *other);
 int list_pop(List *l, uint32_t size, void *item);
+int list_popn(List *l, uint32_t size, uint32_t n);
 int list_remove(List *l, uint32_t size, uint32_t index, void *item);
 int list_get(List *l, uint32_t size, uint32_t index, void *item);
 int list_get_last(List *, uint32_t size, void *item);

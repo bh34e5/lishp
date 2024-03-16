@@ -21,12 +21,10 @@ LishpFunctionReturn system_repl(Interpreter *interpreter, LishpList args) {
   LishpFunction *format_fn =
       symbol_function(rt, common_lisp->global, format_sym);
 
-  LishpString *output_str = ALLOCATE_OBJ(LishpString, rt);
-  *output_str = STRING("~a~%");
-
   while (1) {
-    LishpFunctionReturn read_ret =
-        interpret_function_call(interpreter, read_fn, NIL_LIST);
+    push_function(interpreter, read_fn);
+
+    LishpFunctionReturn read_ret = interpret_function_call(interpreter, 0);
     CHECK_GO_RET(read_ret);
 
     LishpForm read_form = read_ret.first_return;
@@ -45,16 +43,18 @@ LishpFunctionReturn system_repl(Interpreter *interpreter, LishpList args) {
     // NOTE: don't need to call eval, because the form gets evaluated as a
     // result of calling the FORMAT function
 
-    LishpCons *form_nil = ALLOCATE_OBJ(LishpCons, rt);
-    LishpCons *str_form_nil = ALLOCATE_OBJ(LishpCons, rt);
-    LishpCons *t_str_form_nil = ALLOCATE_OBJ(LishpCons, rt);
+    push_function(interpreter, format_fn);
 
-    *form_nil = CONS(read_form, NIL);
-    *str_form_nil = CONS(FROM_OBJ(output_str), FROM_OBJ(form_nil));
-    *t_str_form_nil = CONS(T, FROM_OBJ(str_form_nil));
+    push_argument(interpreter, T);
 
-    LishpFunctionReturn format_ret = interpret_function_call(
-        interpreter, format_fn, LIST_OF(t_str_form_nil));
+    LishpString *output_str = ALLOCATE_OBJ(LishpString, rt);
+    *output_str = STRING("~A~%");
+    push_argument(interpreter, FROM_OBJ(output_str));
+
+    push_argument(interpreter, read_form);
+
+    LishpFunctionReturn format_ret = interpret_function_call(interpreter, 3);
+
     CHECK_GO_RET(format_ret);
   }
   // bye bye
@@ -119,22 +119,23 @@ LishpFunctionReturn system_read_open_paren(Interpreter *interpreter,
   fwrite(string_buf.items, sizeof(char), string_buf.size, temp_file_stream);
   rewind(temp_file_stream);
 
-  LishpStream *sstream_obj = ALLOCATE_OBJ(LishpStream, rt);
-  LishpCons *stream_nil = ALLOCATE_OBJ(LishpCons, rt);
-
-  *sstream_obj = STREAM(kInputOutput, temp_file_stream);
-  *stream_nil = CONS(FROM_OBJ(sstream_obj), NIL);
-
-  LishpList rec_read_call_args = LIST_OF(stream_nil);
-
   while (1) {
     long pos = ftell(temp_file_stream);
     if (is_whitespace(&string_buf, pos)) {
       break;
     }
 
-    LishpFunctionReturn read_res =
-        interpret_function_call(interpreter, user_read, rec_read_call_args);
+    push_function(interpreter, user_read);
+
+    // Yes! Lets allocate a new stream object every time! /s
+    //
+    // This should eventually probably be a bound variable so it's _somewhere_
+    // non-local stack.
+    LishpStream *sstream_obj = ALLOCATE_OBJ(LishpStream, rt);
+    *sstream_obj = STREAM(kInputOutput, temp_file_stream);
+    push_argument(interpreter, FROM_OBJ(sstream_obj));
+
+    LishpFunctionReturn read_res = interpret_function_call(interpreter, 1);
 
     if (read_res.type == kGoReturn) {
       list_clear(&string_buf);
@@ -281,25 +282,27 @@ LishpFunctionReturn system_read_single_quote(Interpreter *interpreter,
   LishpForm stream_form = args.cons->car;
 
   assert(IS_OBJECT_TYPE(stream_form, kStream) && "Expected stream!");
-  LishpStream *stm_obj = AS_OBJECT(LishpStream, stream_form);
 
-  LishpCons *stream_nil = ALLOCATE_OBJ(LishpCons, rt);
-  *stream_nil = CONS(FROM_OBJ(stm_obj), NIL);
-
-  LishpList rec_read_call_args = LIST_OF(stream_nil);
-
-  LishpFunctionReturn read_func_ret =
-      interpret_function_call(interpreter, user_read, rec_read_call_args);
+  push_function(interpreter, user_read);
+  push_argument(interpreter, stream_form);
+  LishpFunctionReturn read_func_ret = interpret_function_call(interpreter, 1);
 
   assert(read_func_ret.return_count == 1);
   LishpForm read_form = read_func_ret.first_return;
 
+  LishpForm *pret_form;
+  push_form_return(interpreter, &pret_form);
+
+  LishpCons *quote_rest = ALLOCATE_OBJ(LishpCons, rt);
+  *quote_rest = CONS(FROM_OBJ(quote_sym), NIL);
+  *pret_form = FROM_OBJ(quote_rest);
+
   LishpCons *form_nil = ALLOCATE_OBJ(LishpCons, rt);
-  LishpCons *quote_form_nil = ALLOCATE_OBJ(LishpCons, rt);
-
   *form_nil = CONS(read_form, NIL);
-  *quote_form_nil = CONS(FROM_OBJ(quote_sym), FROM_OBJ(form_nil));
+  quote_rest->cdr = FROM_OBJ(form_nil);
 
-  LishpForm quote_list = FROM_OBJ(quote_form_nil);
-  return SINGLE_RETURN(quote_list);
+  LishpForm ret_form;
+  pop_form_return(interpreter, &ret_form);
+
+  return SINGLE_RETURN(ret_form);
 }

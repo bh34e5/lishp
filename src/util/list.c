@@ -83,6 +83,18 @@ int list_pop(List *l, uint32_t size, void *item) {
   return 0;
 }
 
+int list_popn(List *l, uint32_t size, uint32_t n) {
+  (void)size; // keeping the arg for symmetry
+
+  if (l->size < n) {
+    return -1;
+  }
+
+  l->size -= n;
+
+  return 0;
+}
+
 int list_remove(List *l, uint32_t size, uint32_t index, void *item) {
   if (index >= l->size) {
     return -1;

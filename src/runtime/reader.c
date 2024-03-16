@@ -243,22 +243,23 @@ step_1:
     goto step_1;
   case kCharTerminatingMacroCharacter:
   case kCharNonTerminatingMacroCharacter: {
-    LishpStream *stream_obj = ALLOCATE_OBJ(LishpStream, rt);
-    LishpCons *c_nil = ALLOCATE_OBJ(LishpCons, rt);
-    LishpCons *stream_c_nil = ALLOCATE_OBJ(LishpCons, rt);
-
-    *stream_obj = STREAM(kInput, reader->in);
-    *c_nil = CONS(FROM_CHAR(x), NIL);
-    *stream_c_nil = CONS(FROM_OBJ(stream_obj), FROM_OBJ(c_nil));
-
-    LishpList args = LIST_OF(stream_c_nil);
+    Interpreter *interpreter = reader->interpreter;
 
     LishpFunction *macro_fn = NULL;
     map_get(&readtable->reader_macros, sizeof(char), sizeof(LishpFunction *),
             &x, &macro_fn);
 
-    LishpFunctionReturn ret =
-        interpret_function_call(reader->interpreter, macro_fn, args);
+    push_function(interpreter, macro_fn);
+
+    LishpStream *stream_obj = ALLOCATE_OBJ(LishpStream, rt);
+    *stream_obj = STREAM(kInput, reader->in);
+    push_argument(interpreter, FROM_OBJ(stream_obj));
+
+    push_argument(interpreter, FROM_CHAR(x));
+
+    LishpFunctionReturn ret = interpret_function_call(interpreter, 2);
+    assert(ret.type != kGoReturn &&
+           "How did we get here? A GO result from macro function");
 
     if (ret.return_count == 0) {
       goto step_1;

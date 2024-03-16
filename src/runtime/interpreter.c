@@ -32,6 +32,7 @@ typedef struct {
   union {
     LishpForm target;
     uint32_t index;
+    uint32_t arg_count;
   };
 } Bytecode;
 
@@ -127,6 +128,8 @@ static int increment_indices_by(List *list, uint32_t inc) {
 #define PUSH_BYTE_2_TARGET(list, opcode, t)                                    \
   _PUSH_BYTE_2(list, opcode, target, t)
 #define PUSH_BYTE_2_INDEX(list, opcode, t) _PUSH_BYTE_2(list, opcode, index, t)
+#define PUSH_BYTE_2_ARG_COUNT(list, opcode, t)                                 \
+  _PUSH_BYTE_2(list, opcode, arg_count, t)
 
 static int analyze_form(List *res, LishpForm form);
 static int analyze_form_rec(List *res, LishpForm form, int with_ret);
@@ -293,6 +296,20 @@ static int analyze_special_form(List *res, SpecialForm sf, LishpForm args) {
   return -1;
 }
 
+static int push_args(List *res, LishpForm args, uint32_t *arg_count) {
+  *arg_count = 0;
+  while (!NIL_P(args)) {
+    assert(IS_OBJECT_TYPE(args, kCons));
+
+    LishpCons *cur = AS_OBJECT(LishpCons, args);
+    PUSH_BYTE_2_TARGET(res, kOpPush, cur->car);
+    ++(*arg_count);
+
+    args = cur->cdr;
+  }
+  return 0;
+}
+
 static int analyze_cons(List *res, LishpCons *cons, int with_ret) {
   LishpForm car = cons->car;
   if (car.type != kObject) {
@@ -305,7 +322,6 @@ static int analyze_cons(List *res, LishpCons *cons, int with_ret) {
     assert(0 && "Unimplemented!");
   } break;
   case kSymbol: {
-    // TODO: check if this is a special form!
     LishpSymbol *sym = AS(LishpSymbol, object);
     SpecialForm sf = is_special_form(sym);
 
@@ -315,8 +331,11 @@ static int analyze_cons(List *res, LishpCons *cons, int with_ret) {
 
     PUSH_BYTE_2_TARGET(res, kOpPush, car);
     PUSH_BYTE_1(res, kOpLookupFunction);
-    PUSH_BYTE_2_TARGET(res, kOpPush, cons->cdr);
-    PUSH_BYTE_1(res, kOpFuncall);
+
+    uint32_t arg_count;
+    push_args(res, cons->cdr, &arg_count);
+
+    PUSH_BYTE_2_ARG_COUNT(res, kOpFuncall, arg_count);
   } break;
   default: {
     return -1;
@@ -511,45 +530,42 @@ static int interpret_byte(Interpreter *interpreter, Bytecode *byte_v) {
     pop_environment(interpreter);
   } break;
   case kOpFuncall: {
-    LishpForm *args_ptr = NULL;
-    LishpForm *form_ptr = NULL;
+    LishpForm *fn_form_ptr = NULL;
 
     uint32_t stack_size = interpreter->form_stack.size;
-    assert(stack_size > 1 && "Stack does not have the right size!");
+    assert(stack_size >= 1 + byte->arg_count &&
+           "Stack does not have the right size!");
 
-    list_ref(&interpreter->form_stack, sizeof(LishpForm), stack_size - 1,
-             (void **)&args_ptr);
-    list_ref(&interpreter->form_stack, sizeof(LishpForm), stack_size - 2,
-             (void **)&form_ptr);
+    list_ref(&interpreter->form_stack, sizeof(LishpForm),
+             stack_size - (1 + byte->arg_count), (void **)&fn_form_ptr);
 
-    assert(IS_OBJECT_TYPE(*form_ptr, kFunction) &&
+    assert(IS_OBJECT_TYPE(*fn_form_ptr, kFunction) &&
            "Cannot call non-function form!");
 
     LishpForm funcall_result;
-    LishpFunction *fn = AS_OBJECT(LishpFunction, *form_ptr);
-
-    LishpList args_list = NIL_LIST;
-    if (args_ptr->type != kNil) {
-      assert(IS_OBJECT_TYPE(*args_ptr, kCons) &&
-             "Arguments to function call must be a cons");
-      args_list = LIST_OF(AS_OBJECT(LishpCons, *args_ptr));
-    }
+    LishpFunction *fn = AS_OBJECT(LishpFunction, *fn_form_ptr);
 
     switch (fn->type) {
     case kInherent: {
+      // interpret function call pops the args and the function
       LishpFunctionReturn ret_val =
-          interpret_function_call(interpreter, fn, args_list);
+          interpret_function_call(interpreter, byte->arg_count);
 
       assert(ret_val.return_count <= 1);
       funcall_result = ret_val.first_return;
     } break;
     case kUserDefined: {
       assert(0 && "Unimplemented!");
+
+      // TODO: when this gets implemented, remember to pop the args and the
+      // function form
+      //
+      // for (uint32_t arg_i = 0; arg_i < byte->arg_count; ++arg_i) {
+      //   list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
+      // }
+      // list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
     } break;
     }
-
-    list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
-    list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
 
     list_push(&interpreter->form_stack, sizeof(LishpForm), &funcall_result);
   } break;
@@ -775,59 +791,123 @@ LishpFunctionReturn interpret(Interpreter *interpreter, LishpForm form) {
   return result;
 }
 
+int push_function(Interpreter *interpreter, LishpFunction *fn) {
+  LishpForm fn_form = FROM_OBJ(fn);
+  return list_push(&interpreter->form_stack, sizeof(LishpForm), &fn_form);
+}
+
+int push_argument(Interpreter *interpreter, LishpForm form) {
+  return list_push(&interpreter->form_stack, sizeof(LishpForm), &form);
+}
+
 LishpFunctionReturn interpret_function_call(Interpreter *interpreter,
-                                            LishpFunction *fn, LishpList args) {
+                                            uint32_t arg_count) {
 
   Runtime *rt = interpreter->rt;
+  uint32_t fn_index = interpreter->form_stack.size - (1 + arg_count);
 
   push_environment(interpreter, kSourceFuncall);
+
+  LishpForm *fn_form;
+  list_ref(&interpreter->form_stack, sizeof(LishpForm), fn_index,
+           (void **)&fn_form);
+
+  LishpFunction *fn = AS_OBJECT(LishpFunction, *fn_form);
 
   List bytes;
   list_init(&bytes);
 
-  LishpList args_list = NIL_LIST;
-  LishpCons *last_cons = NULL;
+  LishpForm evaled_args_form = NIL;
+  list_push(&interpreter->form_stack, sizeof(LishpForm), &evaled_args_form);
 
-  if (!args.nil) {
-    LishpForm cdr;
-    LishpCons *cur_cons = args.cons;
-    do {
-      LishpForm car = cur_cons->car;
+  LishpCons **cur_cons = NULL;
+  uint32_t pevaled_index = interpreter->form_stack.size - 1;
 
-      int analyze_res = analyze_form(&bytes, car);
-      if (analyze_res < 0) {
-        assert(0 && "Error while analyzing form");
-      }
+  for (uint32_t arg_i = 0; arg_i < arg_count; ++arg_i) {
+    LishpForm *pform;
 
-      LishpFunctionReturn arg_val = interpret_bytes(interpreter, bytes);
-      list_clear(&bytes);
+    list_ref(&interpreter->form_stack, sizeof(LishpForm), fn_index + 1 + arg_i,
+             (void **)&pform);
 
-      CHECK_GO_RET(arg_val);
+    int analyze_res = analyze_form(&bytes, *pform);
+    if (analyze_res < 0) {
+      assert(0 && "Error while analyzing form");
+    }
 
-      LishpCons *next_cons = ALLOCATE_OBJ(LishpCons, rt);
-      *next_cons = CONS(arg_val.first_return, NIL);
+    LishpFunctionReturn arg_val = interpret_bytes(interpreter, bytes);
+    list_clear(&bytes);
 
-      if (last_cons != NULL) {
-        last_cons->cdr = FROM_OBJ(next_cons);
-      } else {
-        args_list = LIST_OF(next_cons);
-      }
+    CHECK_GO_RET(arg_val);
 
-      last_cons = next_cons;
+    // cur_pevaled is the pointer to the form that is about to be turned from
+    // NIL to a Cons
 
-      cdr = cur_cons->cdr;
-      assert((NIL_P(cdr) || IS_OBJECT_TYPE(cdr, kCons)) &&
-             "Cannot handle dotted pair in function call!");
+    // cur_cons _will_ get assigned to be a pointer to the address of the newly
+    // created cons, so coming in, it's pointer to the address of the
+    // _previously_ allocated cons
 
-      cur_cons = AS_OBJECT(LishpCons, cdr);
-    } while (!NIL_P(cdr));
+    LishpForm *cur_pevaled;
+    if (cur_cons == NULL) {
+      // first iteration, get the form from the stack
+      list_ref(&interpreter->form_stack, sizeof(LishpForm), pevaled_index,
+               (void **)&cur_pevaled);
+
+      // get a valid reference to the object field of the form on the stack
+      cur_cons = (LishpCons **)&cur_pevaled->object;
+    } else {
+      cur_pevaled = &(*cur_cons)->cdr;
+    }
+
+    // change it from NIL to an object
+    *cur_pevaled = FROM_OBJ(NULL);
+
+    // get the pointer of the address of the cons to be created
+    cur_cons = (LishpCons **)&cur_pevaled->object;
+    // set the address of the cons to be what comes from the allocator
+    *cur_cons = ALLOCATE_OBJ(LishpCons, rt);
+    // fill in the cons fields
+    **cur_cons = CONS(arg_val.first_return, NIL);
   }
 
-  LishpFunctionReturn result = fn->inherent_fn(interpreter, args_list);
+  LishpList arg_list = NIL_LIST;
+  if (arg_count != 0) {
+    LishpForm *pevaled;
+    list_ref(&interpreter->form_stack, sizeof(LishpForm), pevaled_index,
+             (void **)&pevaled);
+
+    LishpCons *arg_cons = AS_OBJECT(LishpCons, *pevaled);
+    arg_list = LIST_OF(arg_cons);
+  }
+
+  LishpFunctionReturn result = fn->inherent_fn(interpreter, arg_list);
+
+  // pop off the evaled_args_form
+  list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
+  // pop the arguments
+  for (uint32_t arg_i = 0; arg_i < arg_count; ++arg_i) {
+    list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
+  }
+  // pop the function form
+  list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);
 
   pop_environment(interpreter);
 
   return result;
+}
+
+int push_form_return(Interpreter *interpreter, LishpForm **pform) {
+  LishpForm nil_form = NIL;
+
+  TEST_CALL(list_push(&interpreter->form_stack, sizeof(LishpForm), &nil_form));
+  TEST_CALL(list_ref_last(&interpreter->form_stack, sizeof(LishpForm),
+                          (void **)pform));
+
+  return 0;
+}
+
+int pop_form_return(Interpreter *interpreter, LishpForm *result) {
+  TEST_CALL(list_pop(&interpreter->form_stack, sizeof(LishpForm), result));
+  return 0;
 }
 
 Runtime *get_runtime(Interpreter *interpreter) { return interpreter->rt; }

@@ -288,7 +288,9 @@ static void repl(Runtime *rt) {
   LishpFunction *repl_fn =
       symbol_function(rt, system_package->global, repl_sym);
 
-  interpret_function_call(rt->interpreter, repl_fn, NIL_LIST);
+  push_function(rt->interpreter, repl_fn);
+
+  interpret_function_call(rt->interpreter, 0);
 }
 
 static void mark_used_objs(Runtime *rt) { assert(0 && "Unimplemented!"); }
