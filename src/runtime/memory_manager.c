@@ -96,6 +96,7 @@ look_for_match:
     if (result->size < 2 * sizeof(MarkingInfo) + size) {
       // we don't have enough extra space to allocate a new header, so keep
       // looking for a match
+      ptr = &(*ptr)->next;
       goto look_for_match;
     }
 
