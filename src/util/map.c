@@ -41,8 +41,8 @@ int map_insert(OrderedMap *m, uint32_t key_size, uint32_t val_size, void *key,
       m->cap = next_cap;
     }
 
-    void *key_target = m->items + (cur_ind * (key_size + val_size));
-    void *val_target = key_target + key_size;
+    void *key_target = (char *)m->items + (cur_ind * (key_size + val_size));
+    void *val_target = (char *)key_target + key_size;
 
     // shift the items up (if ind == size, then it doesn't do anything)
     shift_items(key_target, key_size + val_size, m->size - cur_ind, 1);
@@ -54,8 +54,8 @@ int map_insert(OrderedMap *m, uint32_t key_size, uint32_t val_size, void *key,
     ++m->size;
   } else {
     // replacing a value, don't rewrite the key
-    void *key_target = m->items + (cur_ind * (key_size + val_size));
-    void *val_target = key_target + key_size;
+    void *key_target = (char *)m->items + (cur_ind * (key_size + val_size));
+    void *val_target = (char *)key_target + key_size;
 
     memmove(val_target, value, val_size);
   }
@@ -73,8 +73,8 @@ int map_remove(OrderedMap *m, uint32_t key_size, uint32_t val_size, void *key,
     return -1;
   }
 
-  void *key_target = m->items + (cur_ind * (key_size + val_size));
-  void *val_target = key_target + key_size;
+  void *key_target = (char *)m->items + (cur_ind * (key_size + val_size));
+  void *val_target = (char *)key_target + key_size;
 
   if (value != NULL) {
     memmove(value, val_target, val_size);
@@ -82,7 +82,7 @@ int map_remove(OrderedMap *m, uint32_t key_size, uint32_t val_size, void *key,
 
   --m->size;
 
-  void *end = m->items + (m->size * (key_size + val_size));
+  void *end = (char *)m->items + (m->size * (key_size + val_size));
   shift_items(end, key_size + val_size, m->size - cur_ind, -1);
 
   return 0;
@@ -98,8 +98,8 @@ int map_get(OrderedMap *m, uint32_t key_size, uint32_t val_size, void *key,
     return -1;
   }
 
-  void *key_target = m->items + (cur_ind * (key_size + val_size));
-  void *val_target = key_target + key_size;
+  void *key_target = (char *)m->items + (cur_ind * (key_size + val_size));
+  void *val_target = (char *)key_target + key_size;
 
   memmove(value, val_target, val_size);
 
@@ -116,8 +116,8 @@ int map_ref(OrderedMap *m, uint32_t key_size, uint32_t val_size, void *key,
     return -1;
   }
 
-  void *key_target = m->items + (cur_ind * (key_size + val_size));
-  void *val_target = key_target + key_size;
+  void *key_target = (char *)m->items + (cur_ind * (key_size + val_size));
+  void *val_target = (char *)key_target + key_size;
 
   if (pvalue != NULL) {
     *pvalue = val_target;
@@ -130,8 +130,8 @@ int map_foreach(OrderedMap *m, uint32_t key_size, uint32_t val_size,
                 MapIterator it_fn, void *arg) {
 
   for (uint32_t ind = 0; ind < m->size; ++ind) {
-    void *key_target = m->items + (ind * (key_size + val_size));
-    void *val_target = key_target + key_size;
+    void *key_target = (char *)m->items + (ind * (key_size + val_size));
+    void *val_target = (char *)key_target + key_size;
 
     int it_res = it_fn(arg, key_target, val_target);
     if (it_res != 0) {
@@ -147,7 +147,7 @@ static int find_item(OrderedMap *m, uint32_t item_size, void *key,
   int found_item = 0;
   uint32_t cur_ind = 0;
   while (cur_ind < m->size) {
-    void *item = m->items + (cur_ind * item_size);
+    void *item = (char *)m->items + (cur_ind * item_size);
 
     int cmp = m->cmp_fn(key, item);
     if (cmp == 0) {

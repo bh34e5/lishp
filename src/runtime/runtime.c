@@ -47,11 +47,9 @@ static int initialize_environment(Environment *env, Environment *parent,
   return 0;
 }
 
-static int cleanup_environment(Environment *env) {
+static void cleanup_environment(Environment *env) {
   map_clear(&env->symbol_functions);
   map_clear(&env->symbol_values);
-
-  return 0;
 }
 
 static int empty_name_cmp(void *l, void *r) {
@@ -95,11 +93,10 @@ static int initialize_package(Package *p, Runtime *rt, const char *name) {
   return 0;
 }
 
-static int cleanup_package(Package *p) {
+static void cleanup_package(Package *p) {
   list_clear(&p->exported_symbols);
   map_clear(&p->interned_symbols);
   cleanup_environment(p->global);
-  return 0;
 }
 
 LishpSymbol *intern_symbol(Runtime *rt, Package *p, const char *lexeme) {
@@ -288,7 +285,7 @@ static void repl(Runtime *rt) {
   LishpFunction *repl_fn =
       symbol_function(rt, system_package->global, repl_sym);
 
-  push_function(rt->interpreter, repl_fn);
+  int push_result = push_function(rt->interpreter, repl_fn);
 
   interpret_function_call(rt->interpreter, 0);
 }
@@ -348,7 +345,7 @@ static int sym_func_mark_used_it(void *arg, void *key, void *val) {
   return 0;
 }
 
-int environment_mark_used(Runtime *rt, Environment *env) {
+void environment_mark_used(Runtime *rt, Environment *env) {
   mark_used(rt->memory_manager, env);
   if (env->parent != NULL) {
     environment_mark_used(rt, env->parent);
@@ -358,8 +355,6 @@ int environment_mark_used(Runtime *rt, Environment *env) {
               sym_val_mark_used_it, rt);
   map_foreach(&env->symbol_functions, sizeof(LishpSymbol *),
               sizeof(LishpFunction *), sym_func_mark_used_it, rt);
-
-  return 0;
 }
 
 static int interned_syms_mark_used_it(void *arg, void *key, void *val) {
@@ -433,11 +428,12 @@ int initialize_runtime(Runtime *rt) {
 
 static int cleanup_package_it(void *arg, void *obj) {
   (void)arg;
-  return cleanup_package((Package *)obj);
+  cleanup_package((Package *)obj);
+  return 0;
 }
 
 int cleanup_runtime(Runtime *rt) {
-  cleanup_interpreter(&rt->interpreter);
+  int cleanup_interpreter_result = cleanup_interpreter(&rt->interpreter);
   rt->interpreter = NULL;
 
   // TODO: cleanup system readtable?
@@ -446,7 +442,8 @@ int cleanup_runtime(Runtime *rt) {
   list_clear(&rt->packages);
 
   uint32_t remaining_bytes;
-  cleanup_manager(&rt->memory_manager, &remaining_bytes);
+  int cleanup_manager_result =
+      cleanup_manager(&rt->memory_manager, &remaining_bytes);
 
   fprintf(stdout, "[runtime]: Cleanup with %u bytes still allocated\n",
           remaining_bytes);

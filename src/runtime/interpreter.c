@@ -57,9 +57,8 @@ struct interpreter {
   OrderedMap environment_bindings;  // Environment * -> LishpForm -> uint32_t
 };
 
-static int get_top_frame_ref(Interpreter *interpreter, Frame **pframe) {
+static void get_top_frame_ref(Interpreter *interpreter, Frame **pframe) {
   list_ref_last(&interpreter->frame_stack, sizeof(Frame), (void **)pframe);
-  return 0;
 }
 
 #define FORM_COUNT (sizeof(special_forms) / sizeof(special_forms[0]))
@@ -96,7 +95,7 @@ static SpecialForm is_special_form(LishpSymbol *sym) {
 }
 
 static int push_environment(Interpreter *interpreter, FrameSource source);
-static int pop_environment(Interpreter *interpreter);
+static void pop_environment(Interpreter *interpreter);
 
 static int incrementer(void *arg, void *obj) {
   uint32_t *pinc = arg;
@@ -108,9 +107,8 @@ static int incrementer(void *arg, void *obj) {
   return 0;
 }
 
-static int increment_indices_by(List *list, uint32_t inc) {
+static void increment_indices_by(List *list, uint32_t inc) {
   list_foreach(list, sizeof(Bytecode), incrementer, &inc);
-  return 0;
 }
 
 #define PUSH_BYTE_1(list, opcode)                                              \
@@ -237,7 +235,7 @@ static uint32_t analyze_let_star_bindings(List *res, LishpForm vars) {
 
     PUSH_BYTE_1(res, kOpPushLexicalEnv);
     PUSH_BYTE_2_TARGET(res, kOpPush, name);
-    analyze_form_rec(res, value, 0);
+    int analyze_response = analyze_form_rec(res, value, 0);
     PUSH_BYTE_1(res, kOpBindValue);
     PUSH_BYTE_1(res, kOpPop);
 
@@ -251,6 +249,7 @@ static int analyze_let_star(List *res, LishpForm args) {
   if (NIL_P(args)) {
     // TODO: error message
     assert(0 && "Apparently this is an error?");
+    return -1;
   }
 
   assert(IS_OBJECT_TYPE(args, kCons) && "Cannot handle dotted pair in LET*");
@@ -261,7 +260,7 @@ static int analyze_let_star(List *res, LishpForm args) {
 
   uint32_t bindings_count = analyze_let_star_bindings(res, vars);
 
-  analyze_progn(res, body);
+  int analyze_response = analyze_progn(res, body);
 
   while (bindings_count > 0) {
     PUSH_BYTE_1(res, kOpPopLexicalEnv);
@@ -332,7 +331,7 @@ static int analyze_cons(List *res, LishpCons *cons, int with_ret) {
     PUSH_BYTE_1(res, kOpLookupFunction);
 
     uint32_t arg_count;
-    push_args(res, cons->cdr, &arg_count);
+    int push_response = push_args(res, cons->cdr, &arg_count);
 
     PUSH_BYTE_2_ARG_COUNT(res, kOpFuncall, arg_count);
   } break;
@@ -393,15 +392,12 @@ static int analyze_form(List *res, LishpForm form) {
   return analyze_form_rec(res, form, 1);
 }
 
-static int set_last_return(Interpreter *interpreter, LishpForm result) {
+static void set_last_return(Interpreter *interpreter, LishpForm result) {
   LishpForm *pform = NULL;
-  if (list_ref_last(&interpreter->last_return_value, sizeof(LishpForm),
-                    (void **)&pform) < 0) {
-    return -1;
-  }
+  list_ref_last(&interpreter->last_return_value, sizeof(LishpForm),
+                (void **)&pform);
 
   *pform = result;
-  return 0;
 }
 
 static int _form_cmp(void *l, void *r) {
@@ -523,7 +519,7 @@ static int interpret_byte(Interpreter *interpreter, Bytecode *byte_v) {
     list_push(&interpreter->form_stack, sizeof(LishpForm), pvalue_form);
   } break;
   case kOpPushLexicalEnv: {
-    push_environment(interpreter, kSourceBytes);
+    TEST_CALL(push_environment(interpreter, kSourceBytes));
   } break;
   case kOpPopLexicalEnv: {
     pop_environment(interpreter);
@@ -735,8 +731,8 @@ static LishpFunctionReturn interpret_bytes(Interpreter *interpreter,
 }
 
 static int ptr_diff(void *l, void *r) {
-  void **lptr = l;
-  void **rptr = r;
+  char **lptr = l;
+  char **rptr = r;
 
   return *lptr - *rptr;
 }
@@ -794,7 +790,7 @@ static int frame_mark_used_it(void *arg, void *obj) {
   environment_mark_used(rt, frame->env);
   if (frame->prev != NULL) {
     // this actually maybe doesn't need to exist
-    frame_mark_used_it(arg, frame->prev);
+    TEST_CALL(frame_mark_used_it(arg, frame->prev));
   }
 
   return 0;
@@ -882,7 +878,7 @@ LishpFunctionReturn interpret_function_call(Interpreter *interpreter,
   Runtime *rt = interpreter->rt;
   uint32_t fn_index = interpreter->form_stack.size - (1 + arg_count);
 
-  push_environment(interpreter, kSourceFuncall);
+  int push_env_result = push_environment(interpreter, kSourceFuncall);
 
   LishpForm *fn_form;
   list_ref(&interpreter->form_stack, sizeof(LishpForm), fn_index,
@@ -1002,6 +998,10 @@ static int push_environment(Interpreter *interpreter, FrameSource source) {
   get_top_frame_ref(interpreter, &ptop_frame);
 
   Environment *new_env = allocate_env(interpreter->rt, ptop_frame->env);
+  if (new_env == NULL) {
+    return -1;
+  }
+
   Frame new_frame = (Frame){
       .env = new_env,
       .source = source,
@@ -1009,13 +1009,20 @@ static int push_environment(Interpreter *interpreter, FrameSource source) {
   };
 
   LishpForm nil = NIL;
-  list_push(&interpreter->last_return_value, sizeof(LishpForm), &nil);
-  list_push(&interpreter->frame_stack, sizeof(Frame), &new_frame);
+  TEST_CALL_LABEL(cleanup, list_push(&interpreter->last_return_value,
+                                     sizeof(LishpForm), &nil));
+
+  TEST_CALL_LABEL(
+      cleanup, list_push(&interpreter->frame_stack, sizeof(Frame), &new_frame));
 
   return 0;
+
+cleanup:
+  // TODO: deallocate environment
+  return -1;
 }
 
-static int pop_environment(Interpreter *interpreter) {
+static void pop_environment(Interpreter *interpreter) {
   LishpForm last_return;
   list_pop(&interpreter->last_return_value, sizeof(LishpForm), &last_return);
   list_pop(&interpreter->frame_stack, sizeof(Frame), NULL);
@@ -1027,5 +1034,4 @@ static int pop_environment(Interpreter *interpreter) {
                 (void **)&prev_last_return);
 
   *prev_last_return = last_return;
-  return 0;
 }

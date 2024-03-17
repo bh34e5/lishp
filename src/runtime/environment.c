@@ -60,11 +60,11 @@ static int bind_function_rec(Environment *env, LishpSymbol *sym,
 }
 
 void bind_value(Environment *env, LishpSymbol *sym, LishpForm val) {
-  bind_value_rec(env, sym, val, 1);
+  int bind_response = bind_value_rec(env, sym, val, 1);
 }
 
 void bind_function(Environment *env, LishpSymbol *sym, LishpFunction *fn) {
-  bind_function_rec(env, sym, fn, 1);
+  int bind_response = bind_function_rec(env, sym, fn, 1);
 }
 
 static int symbol_value_int(Runtime *rt, Environment *env, LishpSymbol *sym,

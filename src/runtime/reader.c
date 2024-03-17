@@ -239,13 +239,13 @@ step_1:
     map_get(&readtable->reader_macros, sizeof(char), sizeof(LishpFunction *),
             &x, &macro_fn);
 
-    push_function(interpreter, macro_fn);
+    int push_result0 = push_function(interpreter, macro_fn);
 
     LishpStream *stream_obj = ALLOCATE_OBJ(LishpStream, rt);
     *stream_obj = STREAM(kInput, reader->in);
-    push_argument(interpreter, FROM_OBJ(stream_obj));
+    int push_result1 = push_argument(interpreter, FROM_OBJ(stream_obj));
 
-    push_argument(interpreter, FROM_CHAR(x));
+    int push_result2 = push_argument(interpreter, FROM_CHAR(x));
 
     LishpFunctionReturn ret = interpret_function_call(interpreter, 2);
     assert(ret.type != kGoReturn &&

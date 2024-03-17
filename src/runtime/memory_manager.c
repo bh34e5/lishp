@@ -73,6 +73,8 @@ int initialize_manager(MemoryManager **pmanager, RuntimeMarker runtime_marker,
   return 0;
 }
 
+static void internal_deallocate(MemoryManager *manager, MarkingInfo *freed);
+
 static void run_gc(MemoryManager *manager, MarkingInfo *trigger) {
 #ifdef CHECK_FOR_GARBAGE
   MarkingInfo *cur;
@@ -95,10 +97,7 @@ static void run_gc(MemoryManager *manager, MarkingInfo *trigger) {
   cur = manager->block.first_allocated;
   while (cur != NULL) {
     if (cur->mark == kMarkGrey) {
-      // TODO: maybe add a `deallocate_internal` and make deallocate a wrapper
-      // for that call
-      deallocate(manager, (void *)cur + sizeof(MarkingInfo),
-                 cur->size - sizeof(MarkingInfo));
+      internal_deallocate(manager, cur);
     }
     cur = cur->next;
   }
@@ -176,15 +175,11 @@ look_for_match:
     run_gc(manager, result);
   }
 
-  return (void *)result + sizeof(MarkingInfo);
+  return (char *)result + sizeof(MarkingInfo);
 }
 
-void deallocate(MemoryManager *manager, void *ptr, uint32_t size) {
-  MarkingInfo *freed = ptr - sizeof(MarkingInfo);
-
+static void internal_deallocate(MemoryManager *manager, MarkingInfo *freed) {
   assert(freed->allocated && "Double free!");
-  assert(freed->size == size + sizeof(MarkingInfo) &&
-         "Not freeing the same size as allocated!");
 
   MarkingInfo **allocated = &manager->block.first_allocated;
   while ((*allocated != NULL) && (*allocated != freed)) {
@@ -205,12 +200,21 @@ void deallocate(MemoryManager *manager, void *ptr, uint32_t size) {
   freed->mark = kMarkWhite;
 
   manager->block.first_free = freed;
-  manager->freed_bytes += size;
+  manager->freed_bytes += freed->size - sizeof(MarkingInfo);
+}
+
+void deallocate(MemoryManager *manager, void *ptr, uint32_t size) {
+  MarkingInfo *freed = (MarkingInfo *)ptr - 1;
+
+  assert(freed->size == size + sizeof(MarkingInfo) &&
+         "Not freeing the same size as allocated!");
+
+  internal_deallocate(manager, freed);
 }
 
 void mark_used(MemoryManager *manager, void *ptr) {
   // TODO: should I check that this pointer corresponds to this manager somehow?
-  MarkingInfo *header = ptr - sizeof(MarkingInfo);
+  MarkingInfo *header = (MarkingInfo *)ptr - 1;
   header->mark = kMarkBlack;
 }
 

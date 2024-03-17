@@ -62,6 +62,6 @@ void bind_value(Environment *env, LishpSymbol *sym, LishpForm val);
 void bind_function(Environment *env, LishpSymbol *sym, LishpFunction *fn);
 LishpForm symbol_value(Runtime *rt, Environment *env, LishpSymbol *sym);
 LishpFunction *symbol_function(Runtime *rt, Environment *env, LishpSymbol *sym);
-int environment_mark_used(Runtime *rt, Environment *env);
+void environment_mark_used(Runtime *rt, Environment *env);
 
 #endif

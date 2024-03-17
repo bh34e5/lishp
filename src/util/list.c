@@ -31,7 +31,7 @@ int list_push(List *l, uint32_t size, void *item) {
     l->cap = next_cap;
   }
 
-  void *target = l->items + (l->size * size);
+  void *target = (char *)l->items + (l->size * size);
   memmove(target, item, size);
 
   ++l->size;
@@ -59,7 +59,7 @@ int list_append(List *l, uint32_t size, List *other) {
     l->cap = next_cap;
   }
 
-  void *target = l->items + (l->size * size);
+  void *target = (char *)l->items + (l->size * size);
   memmove(target, other->items, (other->size * size));
 
   l->size += other->size;
@@ -75,7 +75,7 @@ int list_pop(List *l, uint32_t size, void *item) {
 
   --l->size;
 
-  void *target = l->items + (l->size * size);
+  void *target = (char *)l->items + (l->size * size);
   if (item != NULL) {
     memmove(item, target, size);
   }
@@ -100,14 +100,14 @@ int list_remove(List *l, uint32_t size, uint32_t index, void *item) {
     return -1;
   }
 
-  void *target = l->items + (index * size);
+  void *target = (char *)l->items + (index * size);
   if (item != NULL) {
     memmove(item, target, size);
   }
 
   --l->size;
 
-  void *end = l->items + (l->size * size);
+  void *end = (char *)l->items + (l->size * size);
   shift_items(end, size, l->size - index, -1);
 
   return 0;
@@ -118,14 +118,14 @@ int list_get(List *l, uint32_t size, uint32_t index, void *item) {
     return -1;
   }
 
-  void *target = l->items + (index * size);
+  void *target = (char *)l->items + (index * size);
   memmove(item, target, size);
 
   return 0;
 }
 
 int list_get_last(List *l, uint32_t size, void *item) {
-  void *target = l->items + ((l->size - 1) * size);
+  void *target = (char *)l->items + ((l->size - 1) * size);
   memmove(item, target, size);
 
   return 0;
@@ -136,14 +136,14 @@ int list_ref(List *l, uint32_t size, uint32_t index, void **pitem) {
     return -1;
   }
 
-  void *target = l->items + (index * size);
+  void *target = (char *)l->items + (index * size);
   *pitem = target;
 
   return 0;
 }
 
 int list_ref_last(List *l, uint32_t size, void **pitem) {
-  void *target = l->items + ((l->size - 1) * size);
+  void *target = (char *)l->items + ((l->size - 1) * size);
   *pitem = target;
 
   return 0;
@@ -152,7 +152,7 @@ int list_ref_last(List *l, uint32_t size, void **pitem) {
 int list_foreach(List *l, uint32_t size, ListIterator it_fn, void *arg) {
   uint32_t ind = 0;
   while (ind < l->size) {
-    void *item = l->items + (ind * size);
+    void *item = (char *)l->items + (ind * size);
 
     int res = it_fn(arg, item);
     if (res != 0) {
@@ -168,7 +168,7 @@ int list_find(List *l, uint32_t size, ListIterator it_fn, void *arg,
               void **pitem) {
   uint32_t ind = 0;
   while (ind < l->size) {
-    void *item = l->items + (ind * size);
+    void *item = (char *)l->items + (ind * size);
 
     int found = it_fn(arg, item);
     if (found) {
