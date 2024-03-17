@@ -68,15 +68,14 @@ typedef enum {
   kSpGo,
   kSpLetStar,
   kSpProgn,
+  kSpQuote,
   kSpTagbody,
 } SpecialForm;
 
 const char *special_forms[] = {
     // NOTE: make sure this is alphabetic
-    [kSpGo] = "GO",
-    [kSpLetStar] = "LET*",
-    [kSpProgn] = "PROGN",
-    [kSpTagbody] = "TAGBODY",
+    [kSpGo] = "GO",       [kSpLetStar] = "LET*",    [kSpProgn] = "PROGN",
+    [kSpQuote] = "QUOTE", [kSpTagbody] = "TAGBODY",
 };
 
 static SpecialForm is_special_form(LishpSymbol *sym) {
@@ -283,6 +282,13 @@ static int analyze_special_form(List *res, SpecialForm sf, LishpForm args) {
   } break;
   case kSpProgn: {
     return analyze_progn(res, args);
+  } break;
+  case kSpQuote: {
+    assert(IS_OBJECT_TYPE(args, kCons) && "Expected cons in quote");
+    LishpForm car = AS_OBJECT(LishpCons, args)->car;
+    PUSH_BYTE_2_TARGET(res, kOpPush, car);
+    PUSH_BYTE_1(res, kOpRetForm);
+    return 0;
   } break;
   case kSpTagbody: {
     return analyze_tagbody(res, args);
@@ -788,10 +794,6 @@ static int frame_mark_used_it(void *arg, void *obj) {
   Frame *frame = obj;
 
   environment_mark_used(rt, frame->env);
-  if (frame->prev != NULL) {
-    // this actually maybe doesn't need to exist
-    TEST_CALL(frame_mark_used_it(arg, frame->prev));
-  }
 
   return 0;
 }
@@ -953,6 +955,7 @@ LishpFunctionReturn interpret_function_call(Interpreter *interpreter,
   }
 
   LishpFunctionReturn result = fn->inherent_fn(interpreter, arg_list);
+  set_last_return(interpreter, result.first_return);
 
   // pop off the evaled_args_form
   list_pop(&interpreter->form_stack, sizeof(LishpForm), NULL);

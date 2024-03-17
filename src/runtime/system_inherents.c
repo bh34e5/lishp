@@ -82,6 +82,7 @@ static void add_character(List *l, char c) { list_push(l, sizeof(char), &c); }
 
 LishpFunctionReturn system_read_open_paren(Interpreter *interpreter,
                                            LishpList args) {
+
   Runtime *rt = get_runtime(interpreter);
 
   Package *system = find_package(rt, "SYSTEM");
@@ -179,6 +180,7 @@ LishpFunctionReturn system_read_open_paren(Interpreter *interpreter,
 
 LishpFunctionReturn system_read_close_paren(Interpreter *interpreter,
                                             LishpList args) {
+
   (void)interpreter;
   (void)args;
   // FIXME: figure out the proper way to handle this as well...
@@ -291,6 +293,7 @@ LishpFunctionReturn system_read_double_quote(Interpreter *interpreter,
 
 LishpFunctionReturn system_read_single_quote(Interpreter *interpreter,
                                              LishpList args) {
+
   Runtime *rt = get_runtime(interpreter);
 
   Package *common_lisp = find_package(rt, "COMMON-LISP");
