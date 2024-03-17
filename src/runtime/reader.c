@@ -214,6 +214,13 @@ LishpForm read_form(Reader *reader) {
   Token cur_token;
   list_init(&cur_token.characters);
 
+  Package *system = find_package(rt, "SYSTEM");
+  LishpSymbol *genned_stream_sym = gensym(rt, system, NULL);
+  LishpStream *stream_obj = ALLOCATE_OBJ(LishpStream, rt);
+  *stream_obj = STREAM(kInput, reader->in);
+  int bind_result = bind_symbol_value(reader->interpreter, genned_stream_sym,
+                                      FROM_OBJ(stream_obj));
+
   int had_escape = 0;
 
   char x;
@@ -240,11 +247,7 @@ step_1:
             &x, &macro_fn);
 
     int push_result0 = push_function(interpreter, macro_fn);
-
-    LishpStream *stream_obj = ALLOCATE_OBJ(LishpStream, rt);
-    *stream_obj = STREAM(kInput, reader->in);
     int push_result1 = push_argument(interpreter, FROM_OBJ(stream_obj));
-
     int push_result2 = push_argument(interpreter, FROM_CHAR(x));
 
     LishpFunctionReturn ret = interpret_function_call(interpreter, 2);

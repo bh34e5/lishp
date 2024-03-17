@@ -17,6 +17,8 @@ LishpFunctionReturn interpret_function_call(Interpreter *interpreter,
 
 int push_form_return(Interpreter *interpreter, LishpForm **pform);
 int pop_form_return(Interpreter *interpreter, LishpForm *result);
+int bind_symbol_value(Interpreter *interpreter, LishpSymbol *sym,
+                      LishpForm value);
 
 Runtime *get_runtime(Interpreter *interpreter);
 Environment *get_current_environment(Interpreter *interpreter);

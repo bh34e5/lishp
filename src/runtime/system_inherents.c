@@ -12,6 +12,7 @@ LishpFunctionReturn system_repl(Interpreter *interpreter, LishpList args) {
   (void)args;
 
   Runtime *rt = get_runtime(interpreter);
+  Package *system = find_package(rt, "SYSTEM");
   Package *common_lisp = find_package(rt, "COMMON-LISP");
 
   LishpSymbol *read_sym = intern_symbol(rt, common_lisp, "READ");
@@ -20,6 +21,17 @@ LishpFunctionReturn system_repl(Interpreter *interpreter, LishpList args) {
   LishpFunction *read_fn = symbol_function(rt, common_lisp->global, read_sym);
   LishpFunction *format_fn =
       symbol_function(rt, common_lisp->global, format_sym);
+
+  LishpSymbol *genned_format_str_sym = gensym(rt, system, NULL);
+
+  LishpString *output_str = ALLOCATE_OBJ(LishpString, rt);
+  *output_str = STRING(NULL);
+  // bind the value in the current environment so that it get's marked as used
+  int bind_result = bind_symbol_value(interpreter, genned_format_str_sym,
+                                      FROM_OBJ(output_str));
+
+  const char *copied_format_str = allocate_str(rt, "~A~%");
+  *output_str = STRING(copied_format_str);
 
   while (1) {
     int push_result0 = push_function(interpreter, read_fn);
@@ -44,17 +56,9 @@ LishpFunctionReturn system_repl(Interpreter *interpreter, LishpList args) {
     // result of calling the FORMAT function
 
     int push_result1 = push_function(interpreter, format_fn);
-
     int push_result2 = push_argument(interpreter, T);
-
-    LishpString *output_str = ALLOCATE_OBJ(LishpString, rt);
-    *output_str = STRING(NULL);
     int push_result3 = push_argument(interpreter, FROM_OBJ(output_str));
-    const char *copied_format_str = allocate_str(rt, "~A~%");
-    *output_str = STRING(copied_format_str);
-
     int push_result4 = push_argument(interpreter, read_form);
-
     LishpFunctionReturn format_ret = interpret_function_call(interpreter, 3);
 
     CHECK_GO_RET(format_ret);
@@ -80,6 +84,7 @@ LishpFunctionReturn system_read_open_paren(Interpreter *interpreter,
                                            LishpList args) {
   Runtime *rt = get_runtime(interpreter);
 
+  Package *system = find_package(rt, "SYSTEM");
   Package *common_lisp = find_package(rt, "COMMON-LISP");
   LishpSymbol *read_sym = intern_symbol(rt, common_lisp, "READ");
   LishpFunction *user_read = symbol_function(rt, common_lisp->global, read_sym);
@@ -122,6 +127,12 @@ LishpFunctionReturn system_read_open_paren(Interpreter *interpreter,
   fwrite(string_buf.items, sizeof(char), string_buf.size, temp_file_stream);
   rewind(temp_file_stream);
 
+  LishpSymbol *genned_stream_sym = gensym(rt, system, NULL);
+  LishpStream *sstream_obj = ALLOCATE_OBJ(LishpStream, rt);
+  *sstream_obj = STREAM(kInputOutput, temp_file_stream);
+  int bind_result =
+      bind_symbol_value(interpreter, genned_stream_sym, FROM_OBJ(sstream_obj));
+
   while (1) {
     long pos = ftell(temp_file_stream);
     if (is_whitespace(&string_buf, pos)) {
@@ -129,15 +140,7 @@ LishpFunctionReturn system_read_open_paren(Interpreter *interpreter,
     }
 
     int push_result0 = push_function(interpreter, user_read);
-
-    // Yes! Lets allocate a new stream object every time! /s
-    //
-    // This should eventually probably be a bound variable so it's _somewhere_
-    // non-local stack.
-    LishpStream *sstream_obj = ALLOCATE_OBJ(LishpStream, rt);
-    *sstream_obj = STREAM(kInputOutput, temp_file_stream);
     int push_result1 = push_argument(interpreter, FROM_OBJ(sstream_obj));
-
     LishpFunctionReturn read_res = interpret_function_call(interpreter, 1);
 
     if (read_res.type == kGoReturn) {

@@ -983,6 +983,15 @@ int pop_form_return(Interpreter *interpreter, LishpForm *result) {
   return 0;
 }
 
+int bind_symbol_value(Interpreter *interpreter, LishpSymbol *sym,
+                      LishpForm value) {
+
+  Environment *env = get_current_environment(interpreter);
+  bind_value(env, sym, value);
+  // TODO: make this function void, or make bind return an int?
+  return 0;
+}
+
 Runtime *get_runtime(Interpreter *interpreter) { return interpreter->rt; }
 
 Environment *get_current_environment(Interpreter *interpreter) {
