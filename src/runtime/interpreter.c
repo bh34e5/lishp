@@ -3,7 +3,6 @@
 
 #include "common.h"
 #include "runtime/interpreter.h"
-#include "runtime/memory_manager.h"
 
 typedef enum {
   kOpNop,
@@ -838,6 +837,8 @@ static int env_bindings_mark_used_it(void *arg, void *key, void *val) {
 void interpreter_mark_used_objs(Interpreter *interpreter) {
   Runtime *rt = interpreter->rt;
 
+  other_mark_used(rt, interpreter);
+
   list_of_forms_mark_used(rt, &interpreter->form_stack);
   list_of_forms_mark_used(rt, &interpreter->last_return_value);
   list_foreach(&interpreter->frame_stack, sizeof(Frame), frame_mark_used_it,
@@ -900,7 +901,6 @@ LishpFunctionReturn interpret_function_call(Interpreter *interpreter,
 
   for (uint32_t arg_i = 0; arg_i < arg_count; ++arg_i) {
     LishpForm *pform;
-
     list_ref(&interpreter->form_stack, sizeof(LishpForm), fn_index + 1 + arg_i,
              (void **)&pform);
 
@@ -933,13 +933,15 @@ LishpFunctionReturn interpret_function_call(Interpreter *interpreter,
       cur_pevaled = &(*cur_cons)->cdr;
     }
 
+    LishpCons *new_alloc = ALLOCATE_OBJ(LishpCons, rt);
+
     // change it from NIL to an object
     *cur_pevaled = FROM_OBJ(NULL);
 
     // get the pointer of the address of the cons to be created
     cur_cons = (LishpCons **)&cur_pevaled->object;
     // set the address of the cons to be what comes from the allocator
-    *cur_cons = ALLOCATE_OBJ(LishpCons, rt);
+    *cur_cons = new_alloc;
     // fill in the cons fields
     **cur_cons = CONS(arg_val.first_return, NIL);
   }

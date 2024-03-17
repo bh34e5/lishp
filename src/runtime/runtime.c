@@ -295,6 +295,35 @@ static void repl(Runtime *rt) {
 
 void _obj_mark_used(Runtime *rt, LishpObject *obj) {
   mark_used(rt->memory_manager, obj);
+
+  switch (obj->type) {
+  case kCons: {
+    FORM_MARK_USED(rt, AS(LishpCons, obj)->car);
+    FORM_MARK_USED(rt, AS(LishpCons, obj)->cdr);
+  } break;
+  case kString: {
+    const char *lexeme = AS(LishpString, obj)->lexeme;
+    if (lexeme != NULL) {
+      other_mark_used(rt, (void *)lexeme);
+    }
+  } break;
+  case kSymbol: {
+    const char *lexeme = AS(LishpSymbol, obj)->lexeme;
+    if (lexeme != NULL) {
+      other_mark_used(rt, (void *)lexeme);
+    }
+  } break;
+  case kStream: {
+  } break;
+  case kFunction: {
+  } break;
+  case kReadtable: {
+  } break;
+  }
+}
+
+void other_mark_used(Runtime *rt, void *obj) {
+  mark_used(rt->memory_manager, obj);
 }
 
 static int sym_val_mark_used_it(void *arg, void *key, void *val) {
@@ -320,8 +349,7 @@ static int sym_func_mark_used_it(void *arg, void *key, void *val) {
 }
 
 int environment_mark_used(Runtime *rt, Environment *env) {
-  (void)rt;
-
+  mark_used(rt->memory_manager, env);
   if (env->parent != NULL) {
     environment_mark_used(rt, env->parent);
   }
@@ -369,19 +397,21 @@ static int package_mark_used_it(void *arg, void *obj) {
 }
 
 static void objs_mark_used(Runtime *rt) {
-  mark_used(rt->memory_manager, rt->system_readtable);
+  if (rt->system_readtable != NULL) {
+    OBJ_MARK_USED(rt, rt->system_readtable);
+  }
 
-  interpreter_mark_used_objs(rt->interpreter);
+  if (rt->interpreter != NULL) {
+    interpreter_mark_used_objs(rt->interpreter);
+  }
+
   list_foreach(&rt->packages, sizeof(Package), package_mark_used_it, rt);
-
-  assert(0 && "Unimplemented!");
-  return;
 }
 
 int initialize_runtime(Runtime *rt) {
   rt->repl = repl;
 
-  TEST_CALL(initialize_manager(&rt->memory_manager, objs_mark_used));
+  TEST_CALL(initialize_manager(&rt->memory_manager, objs_mark_used, rt));
 
   rt->system_readtable = ALLOCATE_OBJ(LishpReadtable, rt);
 
@@ -408,24 +438,34 @@ static int cleanup_package_it(void *arg, void *obj) {
 
 int cleanup_runtime(Runtime *rt) {
   cleanup_interpreter(&rt->interpreter);
+  rt->interpreter = NULL;
 
   // TODO: cleanup system readtable?
 
   list_foreach(&rt->packages, sizeof(Package), cleanup_package_it, NULL);
   list_clear(&rt->packages);
 
-  uint32_t remaining_bytes = inspect_allocation(rt->memory_manager);
+  uint32_t remaining_bytes;
+  cleanup_manager(&rt->memory_manager, &remaining_bytes);
 
   fprintf(stdout, "[runtime]: Cleanup with %u bytes still allocated\n",
           remaining_bytes);
-
-  cleanup_manager(&rt->memory_manager);
 
   return 0;
 }
 
 void *_allocate_obj(Runtime *rt, uint32_t size) {
   return allocate(rt->memory_manager, size);
+}
+
+const char *allocate_str(Runtime *rt, const char *to_copy) {
+  uint32_t len = strlen(to_copy);
+
+  char *dest = allocate(rt->memory_manager, 1 + len);
+  strncpy(dest, to_copy, len);
+  dest[len] = '\0';
+
+  return dest;
 }
 
 void _deallocate_obj(Runtime *rt, void *ptr, uint32_t size) {

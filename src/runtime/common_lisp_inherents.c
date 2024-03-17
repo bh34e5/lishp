@@ -23,10 +23,10 @@ LishpFunctionReturn common_lisp_read(Interpreter *interpreter, LishpList args) {
     in = stream_obj->file;
   }
 
-  Reader *reader = NULL;
+  Reader reader;
   initialize_reader(&reader, rt, interpreter, in);
 
-  LishpForm form_in = read_form(reader);
+  LishpForm form_in = read_form(&reader);
 
   cleanup_reader(&reader);
 
@@ -38,6 +38,7 @@ LishpFunctionReturn common_lisp_read(Interpreter *interpreter, LishpList args) {
 
 LishpFunctionReturn common_lisp_format(Interpreter *interpreter,
                                        LishpList args) {
+
   assert(!args.nil && "Arguments expected!");
 
   LishpForm rest;

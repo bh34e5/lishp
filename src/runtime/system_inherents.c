@@ -48,8 +48,10 @@ LishpFunctionReturn system_repl(Interpreter *interpreter, LishpList args) {
     push_argument(interpreter, T);
 
     LishpString *output_str = ALLOCATE_OBJ(LishpString, rt);
-    *output_str = STRING("~A~%");
+    *output_str = STRING(NULL);
     push_argument(interpreter, FROM_OBJ(output_str));
+    const char *copied_format_str = allocate_str(rt, "~A~%");
+    *output_str = STRING(copied_format_str);
 
     push_argument(interpreter, read_form);
 
@@ -112,8 +114,9 @@ LishpFunctionReturn system_read_open_paren(Interpreter *interpreter,
     add_character(&string_buf, c);
   }
 
+  // pointer to the address of the last cons that was added
+  LishpCons **last_cons_ptr = NULL;
   LishpForm res_form = NIL;
-  LishpCons *last_cons = NULL;
 
   FILE *temp_file_stream = tmpfile();
   fwrite(string_buf.items, sizeof(char), string_buf.size, temp_file_stream);
@@ -146,16 +149,24 @@ LishpFunctionReturn system_read_open_paren(Interpreter *interpreter,
 
     LishpForm form = read_res.first_return;
 
-    LishpCons *next_cons = ALLOCATE_OBJ(LishpCons, rt);
-    *next_cons = CONS(form, NIL);
-
-    if (last_cons != NULL) {
-      last_cons->cdr = FROM_OBJ(next_cons);
+    LishpForm *cur_return_val;
+    if (last_cons_ptr == NULL) {
+      push_form_return(interpreter, &cur_return_val);
+      last_cons_ptr = (LishpCons **)&cur_return_val->object;
     } else {
-      res_form = FROM_OBJ(next_cons);
+      cur_return_val = &(*last_cons_ptr)->cdr;
     }
 
-    last_cons = next_cons;
+    LishpCons *next_cons = ALLOCATE_OBJ(LishpCons, rt);
+    *cur_return_val = FROM_OBJ(NULL);
+
+    last_cons_ptr = (LishpCons **)&cur_return_val->object;
+    *last_cons_ptr = next_cons;
+    **last_cons_ptr = CONS(form, NIL);
+  }
+
+  if (last_cons_ptr != NULL) {
+    pop_form_return(interpreter, &res_form);
   }
 
   list_clear(&string_buf);
@@ -257,14 +268,22 @@ LishpFunctionReturn system_read_double_quote(Interpreter *interpreter,
   // add null terminator to string
   add_character(&builder, '\0');
 
-  LishpString *str_obj = ALLOCATE_OBJ(LishpString, rt);
-  *str_obj = STRING(builder.items); // FIXME: this is no longer being tracked!
-                                    // Actually, I suppose it kind of is...? The
-                                    // only problem is it's tracked through the
-                                    // realloc / free, not the custom allocator.
-  // list_clear(&builder);
+  LishpForm *res_form_builder;
+  push_form_return(interpreter, &res_form_builder);
 
-  return SINGLE_RETURN(FROM_OBJ(str_obj));
+  LishpString *str_obj = ALLOCATE_OBJ(LishpString, rt);
+  *str_obj = STRING(NULL);
+  *res_form_builder = FROM_OBJ(str_obj);
+
+  const char *copied = allocate_str(rt, builder.items);
+  *str_obj = STRING(copied);
+
+  list_clear(&builder);
+
+  LishpForm ret;
+  pop_form_return(interpreter, &ret);
+
+  return SINGLE_RETURN(ret);
 }
 
 LishpFunctionReturn system_read_single_quote(Interpreter *interpreter,

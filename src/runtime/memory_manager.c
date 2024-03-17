@@ -6,6 +6,11 @@
 #define MEGABYTES(n) ((n) << 20)
 #define BLOCK_SIZE MEGABYTES(4)
 
+#define INITIAL_GC_CHECK 1024
+#define NEXT_GC_CHECK(cur) (2 * (cur))
+
+#define CHECK_FOR_GARBAGE
+
 typedef enum {
   kMarkWhite,
   kMarkGrey,
@@ -27,12 +32,16 @@ typedef struct {
 
 struct manager {
   Block block;
+  uint32_t next_gc_size;
   uint32_t allocated_bytes;
   uint32_t freed_bytes;
   RuntimeMarker runtime_marker;
+  struct runtime *rt;
 };
 
-int initialize_manager(MemoryManager **pmanager, RuntimeMarker runtime_marker) {
+int initialize_manager(MemoryManager **pmanager, RuntimeMarker runtime_marker,
+                       struct runtime *rt) {
+
   char *block_bytes = calloc(1, BLOCK_SIZE);
   if (block_bytes == NULL) {
     return -1;
@@ -53,17 +62,59 @@ int initialize_manager(MemoryManager **pmanager, RuntimeMarker runtime_marker) {
   manager->block.bytes = block_bytes;
   manager->block.first_free = first_free;
   manager->block.first_allocated = NULL;
+  manager->next_gc_size = INITIAL_GC_CHECK;
   manager->allocated_bytes = 0;
   manager->freed_bytes = 0;
   manager->runtime_marker = runtime_marker;
+  manager->rt = rt;
 
   *pmanager = manager;
 
   return 0;
 }
 
-int cleanup_manager(MemoryManager **pmanager) {
+static void run_gc(MemoryManager *manager, MarkingInfo *trigger) {
+#ifdef CHECK_FOR_GARBAGE
+  MarkingInfo *cur;
+
+  // mark all allocated as gray
+  cur = manager->block.first_allocated;
+  while (cur != NULL) {
+    cur->mark = kMarkGrey;
+    cur = cur->next;
+  }
+
+  // mark the trigger as used, and then mark everything reachable from the
+  // runtime as used
+  if (trigger != NULL) {
+    trigger->mark = kMarkBlack;
+  }
+  manager->runtime_marker(manager->rt);
+
+  // remove all the allocations that are still marked grey (not used)
+  cur = manager->block.first_allocated;
+  while (cur != NULL) {
+    if (cur->mark == kMarkGrey) {
+      // TODO: maybe add a `deallocate_internal` and make deallocate a wrapper
+      // for that call
+      deallocate(manager, (void *)cur + sizeof(MarkingInfo),
+                 cur->size - sizeof(MarkingInfo));
+    }
+    cur = cur->next;
+  }
+
+  // recalculate the time to do a garbage collection
+  manager->next_gc_size = NEXT_GC_CHECK(manager->next_gc_size);
+#endif
+}
+
+int cleanup_manager(MemoryManager **pmanager, uint32_t *final_allocated) {
   MemoryManager *manager = *pmanager;
+
+  run_gc(manager, NULL);
+  if (final_allocated != NULL) {
+    *final_allocated = inspect_allocation(manager);
+  }
 
   char *block_bytes = manager->block.bytes;
 
@@ -120,6 +171,10 @@ look_for_match:
 
   manager->block.first_allocated = result;
   manager->allocated_bytes += size;
+
+  if (manager->allocated_bytes >= manager->next_gc_size) {
+    run_gc(manager, result);
+  }
 
   return (void *)result + sizeof(MarkingInfo);
 }

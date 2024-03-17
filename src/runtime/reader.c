@@ -5,12 +5,6 @@
 #include "runtime/reader.h"
 #include "util.h"
 
-struct reader {
-  Runtime *rt;
-  Interpreter *interpreter;
-  FILE *in;
-};
-
 typedef enum {
   kTokenNumber,
   kTokenSymbol,
@@ -195,22 +189,18 @@ CharTraits get_char_traits(LishpReadtable *readtable, char c) {
   return type;
 }
 
-int initialize_reader(Reader **reader, Runtime *rt, Interpreter *interpreter,
+int initialize_reader(Reader *reader, Runtime *rt, Interpreter *interpreter,
                       FILE *in) {
-  *reader = ALLOCATE_OBJ(Reader, rt);
-  if (*reader == NULL) {
-    return -1;
-  }
 
-  (*reader)->rt = rt;
-  (*reader)->interpreter = interpreter;
-  (*reader)->in = in;
+  reader->rt = rt;
+  reader->interpreter = interpreter;
+  reader->in = in;
 
   return 0;
 }
 
-int cleanup_reader(Reader **reader) {
-  DEALLOCATE_OBJ(Reader, *reader, (*reader)->rt);
+int cleanup_reader(Reader *reader) {
+  (void)reader;
   return 0;
 }
 
